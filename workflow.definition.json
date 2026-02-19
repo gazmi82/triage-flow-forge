@@ -1,0 +1,119 @@
+{
+  "schemaVersion": "1.0.0",
+  "definition": {
+    "id": "def.emergency-triage.v4",
+    "key": "emergency_triage",
+    "name": "Emergency Triage",
+    "version": 4,
+    "status": "draft",
+    "description": "Canonical emergency department triage workflow from arrival to discharge.",
+    "lanes": [
+      "reception",
+      "triage_nurse",
+      "physician",
+      "lab",
+      "radiology"
+    ],
+    "slaPolicy": {
+      "defaultTaskDueInMinutes": 30,
+      "warnThresholdMinutes": 15
+    }
+  },
+  "graph": {
+    "startNodeId": "start.patient-arrival",
+    "nodes": [
+      {
+        "id": "start.patient-arrival",
+        "type": "startEvent",
+        "label": "Patient Arrival"
+      },
+      {
+        "id": "task.registration",
+        "type": "userTask",
+        "label": "Registration",
+        "role": "reception",
+        "form": {
+          "fields": [
+            { "id": "patient_name", "label": "Patient Name", "type": "text", "required": true },
+            { "id": "patient_id", "label": "Patient ID", "type": "text", "required": true },
+            { "id": "chief_complaint", "label": "Chief Complaint", "type": "textarea", "required": true }
+          ]
+        }
+      },
+      {
+        "id": "task.triage-assessment",
+        "type": "userTask",
+        "label": "Triage Assessment",
+        "role": "triage_nurse",
+        "form": {
+          "fields": [
+            { "id": "triage_level", "label": "Triage Level", "type": "select", "required": true, "options": ["1", "2", "3", "4", "5"] },
+            { "id": "vitals_recorded", "label": "Vitals Recorded", "type": "boolean", "required": true }
+          ]
+        }
+      },
+      {
+        "id": "gateway.severity",
+        "type": "xorGateway",
+        "label": "Severity?"
+      },
+      {
+        "id": "task.fast-track",
+        "type": "userTask",
+        "label": "Fast Track",
+        "role": "triage_nurse"
+      },
+      {
+        "id": "task.physician-assessment",
+        "type": "userTask",
+        "label": "Physician Assessment",
+        "role": "physician"
+      },
+      {
+        "id": "event.sla-30m",
+        "type": "timerEvent",
+        "label": "SLA 30min",
+        "timer": {
+          "durationISO8601": "PT30M"
+        }
+      },
+      {
+        "id": "event.lab-result",
+        "type": "messageEvent",
+        "label": "Lab Result",
+        "message": {
+          "name": "LabResultReceived"
+        }
+      },
+      {
+        "id": "gateway.join",
+        "type": "andGateway",
+        "label": "Join"
+      },
+      {
+        "id": "end.discharged",
+        "type": "endEvent",
+        "label": "Discharged"
+      }
+    ],
+    "edges": [
+      { "id": "e1", "source": "start.patient-arrival", "target": "task.registration" },
+      { "id": "e2", "source": "task.registration", "target": "task.triage-assessment" },
+      { "id": "e3", "source": "task.triage-assessment", "target": "gateway.severity" },
+      { "id": "e4", "source": "gateway.severity", "target": "task.fast-track", "condition": "triage_level >= 4", "label": "Minor" },
+      { "id": "e5", "source": "gateway.severity", "target": "task.physician-assessment", "condition": "triage_level <= 3", "label": "Critical" },
+      { "id": "e6", "source": "event.sla-30m", "target": "task.physician-assessment", "label": "Escalate" },
+      { "id": "e7", "source": "task.fast-track", "target": "gateway.join" },
+      { "id": "e8", "source": "task.physician-assessment", "target": "gateway.join" },
+      { "id": "e9", "source": "event.lab-result", "target": "gateway.join" },
+      { "id": "e10", "source": "gateway.join", "target": "end.discharged" }
+    ]
+  },
+  "runtime": {
+    "engine": "definition-service",
+    "retryPolicy": {
+      "maxRetries": 3,
+      "backoff": "exponential"
+    }
+  }
+}

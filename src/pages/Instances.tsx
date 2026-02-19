@@ -1,4 +1,4 @@
-import { MOCK_INSTANCES, MOCK_DEFINITIONS } from "@/data/mockData";
+import { MOCK_INSTANCES } from "@/data/mockData";
 import { StatusBadge, PriorityBadge } from "@/components/ui/Badges";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -13,11 +13,6 @@ const STATUS_ICONS = {
 };
 
 export default function Instances() {
-  const defCounts = MOCK_DEFINITIONS.reduce((acc, d) => {
-    acc[d.id] = MOCK_INSTANCES.filter(i => i.definitionId === d.id).length;
-    return acc;
-  }, {} as Record<string, number>);
-
   return (
     <div className="h-full overflow-y-auto p-6 space-y-6">
       <div>
@@ -26,7 +21,7 @@ export default function Instances() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 2xl:grid-cols-4">
         {[
           { label: "Active", value: MOCK_INSTANCES.filter(i => i.status === "active").length, color: "text-success", bg: "bg-success/10 border-success/30" },
           { label: "Completed", value: MOCK_INSTANCES.filter(i => i.status === "completed").length, color: "text-muted-foreground", bg: "bg-muted border-border" },
@@ -87,11 +82,11 @@ export default function Instances() {
                   <td className="px-4 py-3 text-muted-foreground">{timeAgo(inst.startedAt)}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-1">
-                      <Button variant="ghost" size="icon" className="h-7 w-7">
+                      <Button variant="ghost" size="icon" className="h-7 w-7" aria-label={`View instance ${inst.id}`} title={`View instance ${inst.id}`}>
                         <Eye className="h-3.5 w-3.5" />
                       </Button>
                       {inst.status === "error" && (
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive">
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" aria-label={`Retry instance ${inst.id}`} title={`Retry instance ${inst.id}`}>
                           <RotateCcw className="h-3.5 w-3.5" />
                         </Button>
                       )}

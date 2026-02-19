@@ -9,6 +9,7 @@ import {
   useEdgesState,
   type Connection,
   type Node,
+  type ReactFlowInstance,
   BackgroundVariant,
   MarkerType,
 } from "@xyflow/react";
@@ -48,6 +49,7 @@ export function DesignerCanvas() {
   const [nodes, setNodes, onNodesChange] = useNodesState(INITIAL_NODES);
   const [edges, setEdges, onEdgesChange] = useEdgesState(INITIAL_EDGES);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
+  const [flowInstance, setFlowInstance] = useState<ReactFlowInstance | null>(null);
 
   const onConnect = useCallback(
     (params: Connection) => setEdges((eds) => addEdge({ ...params, markerEnd: { type: MarkerType.ArrowClosed }, style: { stroke: "hsl(220,68%,30%)" } }, eds)),
@@ -67,20 +69,17 @@ export function DesignerCanvas() {
       event.preventDefault();
       const type = event.dataTransfer.getData("application/bpmn-node-type");
       const label = event.dataTransfer.getData("application/bpmn-node-label");
-      if (!type) return;
-
-      const bounds = (event.target as HTMLElement).closest(".react-flow")?.getBoundingClientRect();
-      if (!bounds) return;
+      if (!type || !flowInstance) return;
 
       const newNode: Node = {
         id: `node_${Date.now()}`,
         type,
-        position: { x: event.clientX - bounds.left - 60, y: event.clientY - bounds.top - 20 },
+        position: flowInstance.screenToFlowPosition({ x: event.clientX, y: event.clientY }),
         data: { label },
       };
       setNodes((nds) => [...nds, newNode]);
     },
-    [setNodes]
+    [flowInstance, setNodes]
   );
 
   const onDragOver = useCallback((event: React.DragEvent) => {
@@ -111,7 +110,7 @@ export function DesignerCanvas() {
       {/* Canvas */}
       <div className="flex flex-1 flex-col">
         <DesignerToolbar />
-        <div className="flex-1" onDrop={onDrop} onDragOver={onDragOver}>
+        <div className="flex-1">
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -120,6 +119,9 @@ export function DesignerCanvas() {
             onConnect={onConnect}
             onNodeClick={onNodeClick}
             onPaneClick={onPaneClick}
+            onInit={setFlowInstance}
+            onDrop={onDrop}
+            onDragOver={onDragOver}
             nodeTypes={NODE_TYPES}
             fitView
             className="h-full"

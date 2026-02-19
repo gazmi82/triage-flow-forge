@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import {
   Activity, ClipboardList, GitBranch, AlertTriangle,
-  Clock, CheckCircle2, Loader2, TrendingUp, Users
+  Clock, Loader2, TrendingUp
 } from "lucide-react";
 
 function StatCard({ icon: Icon, label, value, sub, color }: { icon: React.ElementType; label: string; value: string | number; sub?: string; color: string }) {
@@ -28,7 +28,9 @@ export default function Index() {
   const activeTasks = MOCK_TASKS.filter(t => t.status !== "completed");
   const overdueTasks = MOCK_TASKS.filter(t => t.minutesRemaining < 0);
   const activeInstances = MOCK_INSTANCES.filter(i => i.status === "active");
-  const criticalTasks = MOCK_TASKS.filter(t => t.priority === "critical");
+  const urgentTasks = [...activeTasks]
+    .sort((a, b) => a.minutesRemaining - b.minutesRemaining)
+    .slice(0, 5);
 
   return (
     <div className="h-full overflow-y-auto p-6 space-y-6">
@@ -45,14 +47,14 @@ export default function Index() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 2xl:grid-cols-4">
         <StatCard icon={Activity} label="Active Instances" value={activeInstances.length} sub={`${MOCK_INSTANCES.length} total today`} color="bg-primary/10 text-primary" />
         <StatCard icon={ClipboardList} label="Open Tasks" value={activeTasks.length} sub="Pending in inbox" color="bg-accent/15 text-accent" />
         <StatCard icon={AlertTriangle} label="SLA Breaches" value={overdueTasks.length} sub="Require immediate attention" color="bg-destructive/10 text-destructive" />
         <StatCard icon={GitBranch} label="Definitions" value={MOCK_DEFINITIONS.filter(d => d.status === "published").length} sub="Published & active" color="bg-node-gateway-and/10 text-node-gateway-and" />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         {/* Urgent Tasks */}
         <div className="rounded-lg border border-border bg-card overflow-hidden">
           <div className="border-b border-border px-4 py-3 flex items-center gap-2">
@@ -61,7 +63,7 @@ export default function Index() {
             <button onClick={() => navigate("/tasks")} className="ml-auto text-[10px] text-accent hover:underline font-medium">View all →</button>
           </div>
           <div className="divide-y divide-border">
-            {MOCK_TASKS.map((task) => (
+            {urgentTasks.map((task) => (
               <button
                 key={task.id}
                 onClick={() => navigate("/tasks")}
@@ -121,7 +123,7 @@ export default function Index() {
           <TrendingUp className="h-4 w-4 text-muted-foreground" />
           <p className="text-sm font-semibold">Process Health</p>
         </div>
-        <div className="grid grid-cols-4 divide-x divide-border">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
           {MOCK_DEFINITIONS.map((def) => (
             <div key={def.id} className="p-4">
               <div className="flex items-center justify-between mb-2">

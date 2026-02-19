@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { MOCK_TASKS, MOCK_AUDIT, type Task } from "@/data/mockData";
 import { RoleBadge, PriorityBadge, StatusBadge } from "@/components/ui/Badges";
 import { Button } from "@/components/ui/button";
@@ -28,8 +28,46 @@ function SlaTimer({ minutesRemaining }: { minutesRemaining: number }) {
 
 function TaskForm({ task, onComplete }: { task: Task; onComplete: () => void }) {
   const { toast } = useToast();
+  const [values, setValues] = useState<Record<string, string | boolean>>({});
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    setValues({});
+    setErrors({});
+  }, [task.id]);
+
+  const setFieldValue = (fieldId: string, value: string | boolean) => {
+    setValues((prev) => ({ ...prev, [fieldId]: value }));
+    setErrors((prev) => {
+      if (!prev[fieldId]) return prev;
+      const { [fieldId]: _removed, ...rest } = prev;
+      return rest;
+    });
+  };
+
+  const validate = () => {
+    const nextErrors: Record<string, string> = {};
+    for (const field of task.formFields) {
+      if (!field.required) continue;
+      const value = values[field.id];
+      if (field.type === "boolean") {
+        if (typeof value !== "boolean") nextErrors[field.id] = "This field is required.";
+        continue;
+      }
+      if (typeof value !== "string" || value.trim().length === 0) {
+        nextErrors[field.id] = "This field is required.";
+      }
+    }
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!validate()) {
+      toast({ title: "Missing required fields", description: "Complete all required inputs before submitting.", variant: "destructive" });
+      return;
+    }
     toast({ title: "Task completed", description: `"${task.name}" has been completed and the process advanced.` });
     onComplete();
   };
@@ -42,12 +80,37 @@ function TaskForm({ task, onComplete }: { task: Task; onComplete: () => void }) 
             {field.label}
             {field.required && <span className="ml-1 text-destructive">*</span>}
           </Label>
-          {field.type === "text" && <Input className="h-8 text-sm" required={field.required} />}
-          {field.type === "number" && <Input type="number" className="h-8 text-sm" required={field.required} />}
-          {field.type === "textarea" && <Textarea className="text-sm min-h-[72px]" required={field.required} />}
+          {field.type === "text" && (
+            <Input
+              className="h-8 text-sm"
+              value={typeof values[field.id] === "string" ? values[field.id] : ""}
+              onChange={(e) => setFieldValue(field.id, e.target.value)}
+              aria-invalid={Boolean(errors[field.id])}
+            />
+          )}
+          {field.type === "number" && (
+            <Input
+              type="number"
+              className="h-8 text-sm"
+              value={typeof values[field.id] === "string" ? values[field.id] : ""}
+              onChange={(e) => setFieldValue(field.id, e.target.value)}
+              aria-invalid={Boolean(errors[field.id])}
+            />
+          )}
+          {field.type === "textarea" && (
+            <Textarea
+              className="text-sm min-h-[72px]"
+              value={typeof values[field.id] === "string" ? values[field.id] : ""}
+              onChange={(e) => setFieldValue(field.id, e.target.value)}
+              aria-invalid={Boolean(errors[field.id])}
+            />
+          )}
           {field.type === "select" && (
-            <Select required={field.required}>
-              <SelectTrigger className="h-8 text-sm">
+            <Select
+              value={typeof values[field.id] === "string" ? values[field.id] : undefined}
+              onValueChange={(value) => setFieldValue(field.id, value)}
+            >
+              <SelectTrigger className="h-8 text-sm" aria-invalid={Boolean(errors[field.id])}>
                 <SelectValue placeholder="Select..." />
               </SelectTrigger>
               <SelectContent>
@@ -59,10 +122,16 @@ function TaskForm({ task, onComplete }: { task: Task; onComplete: () => void }) 
           )}
           {field.type === "boolean" && (
             <div className="flex items-center gap-2">
-              <Checkbox id={field.id} />
+              <Checkbox
+                id={field.id}
+                checked={values[field.id] === true}
+                onCheckedChange={(checked) => setFieldValue(field.id, checked === true)}
+                aria-invalid={Boolean(errors[field.id])}
+              />
               <label htmlFor={field.id} className="text-sm cursor-pointer">Yes</label>
             </div>
           )}
+          {errors[field.id] && <p className="text-[11px] text-destructive">{errors[field.id]}</p>}
         </div>
       ))}
       <div className="flex gap-2 pt-2">
@@ -115,15 +184,24 @@ export default function Tasks() {
   const [search, setSearch] = useState("");
   const [showTimeline, setShowTimeline] = useState(false);
 
-  const filtered = tasks.filter(t =>
-    t.name.toLowerCase().includes(search.toLowerCase()) ||
-    t.patientName.toLowerCase().includes(search.toLowerCase())
+  const filtered = useMemo(
+    () =>
+      tasks.filter(
+        (t) => t.name.toLowerCase().includes(search.toLowerCase()) || t.patientName.toLowerCase().includes(search.toLowerCase())
+      ),
+    [search, tasks]
   );
+
+  useEffect(() => {
+    if (!selectedTask) return;
+    if (!tasks.some((task) => task.id === selectedTask.id)) {
+      setSelectedTask(tasks[0] ?? null);
+    }
+  }, [selectedTask, tasks]);
 
   const completeTask = () => {
     if (!selectedTask) return;
-    setTasks(prev => prev.filter(t => t.id !== selectedTask.id));
-    setSelectedTask(null);
+    setTasks((prev) => prev.filter((t) => t.id !== selectedTask.id));
   };
 
   const claimTask = (task: Task) => {
@@ -132,9 +210,9 @@ export default function Tasks() {
   };
 
   return (
-    <div className="flex h-full">
+    <div className="flex h-full flex-col md:flex-row">
       {/* Task List */}
-      <div className="flex w-80 flex-col border-r border-border bg-card">
+      <div className="flex w-full flex-col border-b border-border bg-card md:w-80 md:min-w-80 md:border-b-0 md:border-r">
         <div className="border-b border-border p-4">
           <h2 className="text-sm font-bold mb-2">My Task Inbox</h2>
           <div className="relative">
@@ -186,7 +264,7 @@ export default function Tasks() {
           {/* Header */}
           <div className="border-b border-border bg-card px-6 py-4">
             <div className="flex items-start justify-between">
-              <div>
+              <div className="min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <h1 className="text-base font-bold">{selectedTask.name}</h1>
                   <PriorityBadge priority={selectedTask.priority} />
@@ -196,7 +274,7 @@ export default function Tasks() {
                   {selectedTask.definitionName} · Instance {selectedTask.instanceId} · Patient: <strong>{selectedTask.patientName}</strong> ({selectedTask.patientId})
                 </p>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Button
                   variant="outline" size="sm"
                   className="h-8 text-xs gap-1.5"
@@ -224,7 +302,7 @@ export default function Tasks() {
             </div>
           </div>
 
-          <div className="flex flex-1 overflow-hidden">
+          <div className="flex flex-1 flex-col overflow-hidden md:flex-row">
             {/* Form */}
             <div className="flex-1 overflow-y-auto p-6">
               <p className="mb-4 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Task Form</p>
@@ -235,7 +313,7 @@ export default function Tasks() {
 
             {/* Timeline */}
             {showTimeline && (
-              <div className="w-72 border-l border-border overflow-y-auto p-4 bg-muted/20">
+              <div className="w-full border-t border-border overflow-y-auto bg-muted/20 p-4 md:w-72 md:border-l md:border-t-0">
                 <p className="mb-4 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Audit Timeline</p>
                 <AuditTimeline instanceId={selectedTask.instanceId} />
               </div>

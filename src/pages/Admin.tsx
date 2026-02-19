@@ -1,12 +1,10 @@
 import { useState } from "react";
-import { MOCK_USERS, MOCK_DEFINITIONS, ROLE_LABELS, type Role } from "@/data/mockData";
+import { MOCK_USERS, MOCK_DEFINITIONS, type Role } from "@/data/mockData";
 import { RoleBadge, StatusBadge } from "@/components/ui/Badges";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GitBranch, Users, CheckCircle2, XCircle, Plus } from "lucide-react";
-
-const ROLES: Role[] = ["reception", "triage_nurse", "physician", "lab", "radiology", "admin"];
 
 export default function Admin() {
   const [activeTab, setActiveTab] = useState("definitions");
