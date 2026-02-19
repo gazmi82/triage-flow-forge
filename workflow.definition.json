@@ -1,116 +1,188 @@
 {
   "schemaVersion": "1.0.0",
   "definition": {
-    "id": "def.emergency-triage.v4",
+    "id": "def.emergency_triage.v4",
     "key": "emergency_triage",
     "name": "Emergency Triage",
     "version": 4,
     "status": "draft",
-    "description": "Canonical emergency department triage workflow from arrival to discharge.",
+    "description": "Design and publish BPMN process definitions for emergency triage.",
     "lanes": [
       "reception",
       "triage_nurse",
-      "physician",
-      "lab",
-      "radiology"
+      "physician"
     ],
     "slaPolicy": {
       "defaultTaskDueInMinutes": 30,
       "warnThresholdMinutes": 15
     }
   },
+  "ui": {
+    "navigation": {
+      "topNavbar": {
+        "enabled": true,
+        "height": 56,
+        "showsRouteTitle": true,
+        "showsSessionBadge": true,
+        "userMenu": {
+          "trigger": {
+            "showsAvatar": true,
+            "showsName": true,
+            "showsEmail": true
+          },
+          "items": [
+            { "id": "profile", "label": "Profile", "kind": "action" },
+            { "id": "settings", "label": "Settings", "kind": "route", "to": "/admin" },
+            { "id": "account", "label": "Account", "kind": "action" },
+            { "id": "sign_out", "label": "Sign out", "kind": "auth" }
+          ]
+        }
+      }
+    },
+    "canvas": {
+      "fitView": true,
+      "background": {
+        "variant": "dots",
+        "gap": 20,
+        "size": 1
+      }
+    }
+  },
   "graph": {
-    "startNodeId": "start.patient-arrival",
+    "startNodeId": "start1",
     "nodes": [
       {
-        "id": "start.patient-arrival",
+        "id": "start1",
         "type": "startEvent",
-        "label": "Patient Arrival"
+        "label": "Patient Arrival",
+        "position": { "x": 80, "y": 200 }
       },
       {
-        "id": "task.registration",
+        "id": "task1",
         "type": "userTask",
         "label": "Registration",
-        "role": "reception",
+        "role": {
+          "key": "reception",
+          "label": "Reception"
+        },
+        "position": { "x": 220, "y": 175 },
         "form": {
           "fields": [
             { "id": "patient_name", "label": "Patient Name", "type": "text", "required": true },
             { "id": "patient_id", "label": "Patient ID", "type": "text", "required": true },
-            { "id": "chief_complaint", "label": "Chief Complaint", "type": "textarea", "required": true }
+            { "id": "chief_complaint", "label": "Chief Complaint", "type": "textarea", "required": false }
           ]
         }
       },
       {
-        "id": "task.triage-assessment",
+        "id": "task2",
         "type": "userTask",
         "label": "Triage Assessment",
-        "role": "triage_nurse",
+        "role": {
+          "key": "triage_nurse",
+          "label": "Triage Nurse"
+        },
+        "position": { "x": 420, "y": 175 },
         "form": {
           "fields": [
-            { "id": "triage_level", "label": "Triage Level", "type": "select", "required": true, "options": ["1", "2", "3", "4", "5"] },
-            { "id": "vitals_recorded", "label": "Vitals Recorded", "type": "boolean", "required": true }
+            { "id": "bp_sys", "label": "Blood Pressure (Systolic)", "type": "number", "required": true },
+            { "id": "bp_dia", "label": "Blood Pressure (Diastolic)", "type": "number", "required": true },
+            { "id": "heart_rate", "label": "Heart Rate (bpm)", "type": "number", "required": true },
+            { "id": "temp", "label": "Temperature (°C)", "type": "number", "required": true },
+            { "id": "spo2", "label": "SpO2 (%)", "type": "number", "required": true }
           ]
         }
       },
       {
-        "id": "gateway.severity",
+        "id": "gw1",
         "type": "xorGateway",
-        "label": "Severity?"
+        "label": "Severity?",
+        "position": { "x": 620, "y": 188 }
       },
       {
-        "id": "task.fast-track",
+        "id": "task3",
         "type": "userTask",
         "label": "Fast Track",
-        "role": "triage_nurse"
+        "role": {
+          "key": "triage_nurse",
+          "label": "Triage Nurse"
+        },
+        "position": { "x": 730, "y": 120 }
       },
       {
-        "id": "task.physician-assessment",
+        "id": "task4",
         "type": "userTask",
         "label": "Physician Assessment",
-        "role": "physician"
+        "role": {
+          "key": "physician",
+          "label": "Physician"
+        },
+        "position": { "x": 730, "y": 260 },
+        "form": {
+          "fields": [
+            { "id": "diagnosis", "label": "Primary Diagnosis", "type": "text", "required": true },
+            { "id": "severity", "label": "Severity Level", "type": "select", "required": true, "options": ["1 - Critical", "2 - Emergent", "3 - Urgent", "4 - Less Urgent", "5 - Non-Urgent"] },
+            { "id": "notes", "label": "Clinical Notes", "type": "textarea", "required": false },
+            { "id": "admit", "label": "Admit to Hospital", "type": "boolean", "required": true }
+          ]
+        }
       },
       {
-        "id": "event.sla-30m",
+        "id": "timer1",
         "type": "timerEvent",
         "label": "SLA 30min",
+        "position": { "x": 620, "y": 350 },
         "timer": {
           "durationISO8601": "PT30M"
         }
       },
       {
-        "id": "event.lab-result",
+        "id": "msg1",
         "type": "messageEvent",
         "label": "Lab Result",
+        "position": { "x": 880, "y": 200 },
         "message": {
           "name": "LabResultReceived"
         }
       },
       {
-        "id": "gateway.join",
+        "id": "gw2",
         "type": "andGateway",
-        "label": "Join"
+        "label": "",
+        "position": { "x": 980, "y": 190 }
       },
       {
-        "id": "end.discharged",
+        "id": "end1",
         "type": "endEvent",
-        "label": "Discharged"
+        "label": "Discharged",
+        "position": { "x": 1100, "y": 200 }
       }
     ],
     "edges": [
-      { "id": "e1", "source": "start.patient-arrival", "target": "task.registration" },
-      { "id": "e2", "source": "task.registration", "target": "task.triage-assessment" },
-      { "id": "e3", "source": "task.triage-assessment", "target": "gateway.severity" },
-      { "id": "e4", "source": "gateway.severity", "target": "task.fast-track", "condition": "triage_level >= 4", "label": "Minor" },
-      { "id": "e5", "source": "gateway.severity", "target": "task.physician-assessment", "condition": "triage_level <= 3", "label": "Critical" },
-      { "id": "e6", "source": "event.sla-30m", "target": "task.physician-assessment", "label": "Escalate" },
-      { "id": "e7", "source": "task.fast-track", "target": "gateway.join" },
-      { "id": "e8", "source": "task.physician-assessment", "target": "gateway.join" },
-      { "id": "e9", "source": "event.lab-result", "target": "gateway.join" },
-      { "id": "e10", "source": "gateway.join", "target": "end.discharged" }
+      { "id": "e1", "source": "start1", "target": "task1", "style": { "kind": "default" } },
+      { "id": "e2", "source": "task1", "target": "task2", "style": { "kind": "default" } },
+      { "id": "e3", "source": "task2", "target": "gw1", "style": { "kind": "default" } },
+      { "id": "e4", "source": "gw1", "target": "task3", "label": "Minor", "style": { "kind": "gateway" } },
+      { "id": "e5", "source": "gw1", "target": "task4", "label": "Critical", "style": { "kind": "gateway" } },
+      { "id": "e6", "source": "timer1", "target": "task4", "label": "Escalate", "style": { "kind": "timer", "dashed": true } },
+      { "id": "e7", "source": "task3", "target": "gw2", "style": { "kind": "default" } },
+      { "id": "e8", "source": "task4", "target": "gw2", "style": { "kind": "default" } },
+      { "id": "e9", "source": "msg1", "target": "gw2", "style": { "kind": "message" } },
+      { "id": "e10", "source": "gw2", "target": "end1", "style": { "kind": "default" } }
     ]
   },
   "runtime": {
     "engine": "definition-service",
+    "supportedNodeTypes": [
+      "startEvent",
+      "endEvent",
+      "userTask",
+      "xorGateway",
+      "andGateway",
+      "timerEvent",
+      "messageEvent",
+      "signalEvent"
+    ],
     "retryPolicy": {
       "maxRetries": 3,
       "backoff": "exponential"

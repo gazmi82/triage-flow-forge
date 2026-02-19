@@ -9,6 +9,12 @@ export interface User {
   active: boolean;
 }
 
+export interface AuthCredential {
+  email: string;
+  password: string;
+  userId: string;
+}
+
 export interface ProcessDefinition {
   id: string;
   key: string;
@@ -83,6 +89,16 @@ export const MOCK_USERS: User[] = [
   { id: "u6", name: "Admin User", email: "admin@hospital.org", role: "admin", department: "IT", active: true },
   { id: "u7", name: "Sarah Kim", email: "s.kim@hospital.org", role: "triage_nurse", department: "Emergency", active: true },
   { id: "u8", name: "Dr. Marcus Webb", email: "m.webb@hospital.org", role: "physician", department: "ICU", active: false },
+];
+
+export const MOCK_AUTH_CREDENTIALS: AuthCredential[] = [
+  { email: "m.santos@hospital.org", password: "demo123", userId: "u1" },
+  { email: "j.okafor@hospital.org", password: "demo123", userId: "u2" },
+  { email: "e.chen@hospital.org", password: "demo123", userId: "u3" },
+  { email: "c.rivera@hospital.org", password: "demo123", userId: "u4" },
+  { email: "p.nair@hospital.org", password: "demo123", userId: "u5" },
+  { email: "admin@hospital.org", password: "admin123", userId: "u6" },
+  { email: "s.kim@hospital.org", password: "demo123", userId: "u7" },
 ];
 
 export const MOCK_DEFINITIONS: ProcessDefinition[] = [

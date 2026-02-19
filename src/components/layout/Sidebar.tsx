@@ -7,9 +7,11 @@ import {
   Activity,
   ChevronRight,
   Hospital,
-  Settings,
+  LogOut,
 } from "lucide-react";
 import { ROLE_LABELS, type Role } from "@/data/mockData";
+import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/use-auth";
 
 const NAV_ITEMS = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
@@ -19,9 +21,17 @@ const NAV_ITEMS = [
   { to: "/admin", icon: Users, label: "Admin" },
 ];
 
-const CURRENT_ROLE: Role = "physician";
-
 export function Sidebar() {
+  const { user, logout } = useAuth();
+  const currentRole: Role = user?.role ?? "physician";
+  const initials =
+    user?.name
+      .split(" ")
+      .map((part) => part[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() ?? "NA";
+
   return (
     <aside className="flex h-screen w-60 flex-col bg-sidebar border-r border-sidebar-border">
       {/* Logo */}
@@ -56,13 +66,29 @@ export function Sidebar() {
       <div className="border-t border-sidebar-border p-3">
         <div className="flex items-center gap-3 rounded-md px-2 py-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-full bg-sidebar-primary text-sidebar-primary-foreground text-xs font-bold flex-shrink-0">
-            EC
+            {initials}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-sidebar-accent-foreground truncate">Dr. Emily Chen</p>
-            <p className="text-[10px] text-sidebar-foreground/70 truncate">{ROLE_LABELS[CURRENT_ROLE]}</p>
+            <p className="text-xs font-semibold text-sidebar-accent-foreground truncate">{user?.name ?? "Unknown User"}</p>
+            <p className="text-[10px] text-sidebar-foreground/70 truncate">{ROLE_LABELS[currentRole]}</p>
           </div>
-          <Settings className="h-4 w-4 text-sidebar-foreground/50 flex-shrink-0" />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-sidebar-foreground/60 hover:text-sidebar-accent-foreground"
+            onClick={logout}
+            aria-label="Sign out"
+            title="Sign out"
+          >
+            <LogOut className="h-4 w-4 flex-shrink-0" />
+          </Button>
+        </div>
+        <div className="mt-2 rounded-md bg-sidebar-accent/60 px-2 py-2">
+          <p className="truncate text-[10px] text-sidebar-foreground/80">{user?.email}</p>
+          <div className="mt-1 flex items-center justify-between text-[9px] uppercase tracking-wider text-sidebar-foreground/60">
+            <span>Mock session</span>
+            <span>online</span>
+          </div>
         </div>
       </div>
     </aside>
