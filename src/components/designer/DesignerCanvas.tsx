@@ -98,6 +98,11 @@ export function DesignerCanvas() {
     setSelectedNode((prev) => prev?.id === id ? { ...prev, data: { ...prev.data, role } } : prev);
   }, [setNodes]);
 
+  const updateNodeType = useCallback((id: string, type: string) => {
+    setNodes((nds) => nds.map((n) => n.id === id ? { ...n, type } : n));
+    setSelectedNode((prev) => prev?.id === id ? { ...prev, type } : prev);
+  }, [setNodes]);
+
   return (
     <div className="flex h-full">
       {/* Left Palette */}
@@ -141,6 +146,7 @@ export function DesignerCanvas() {
         node={selectedNode}
         onLabelChange={updateNodeLabel}
         onRoleChange={updateNodeRole}
+        onTypeChange={updateNodeType}
       />
     </div>
   );
