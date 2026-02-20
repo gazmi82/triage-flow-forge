@@ -21,6 +21,15 @@ const ROLE_OPTIONS: Array<{ value: Role; label: string }> = [
   { value: "admin", label: "Administrator" },
 ];
 
+const SIGN_IN_DEMO_USERS: Array<{ name: string; role: string; email: string; password: string }> = [
+  { name: "Maria Santos", role: "Reception", email: "m.santos@hospital.org", password: "demo123" },
+  { name: "James Okafor", role: "Triage Nurse", email: "j.okafor@hospital.org", password: "demo123" },
+  { name: "Olivia Ross", role: "Reception", email: "o.ross@hospital.org", password: "demo123" },
+  { name: "Dr. Emily Chen", role: "Physician", email: "e.chen@hospital.org", password: "demo123" },
+  { name: "Carlos Rivera", role: "Laboratory", email: "c.rivera@hospital.org", password: "demo123" },
+  { name: "Priya Nair", role: "Radiology", email: "p.nair@hospital.org", password: "demo123" },
+];
+
 export default function Auth() {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -190,19 +199,32 @@ export default function Auth() {
           <Card className="hidden border-border/70 bg-card/80 md:block">
             <CardHeader>
               <CardTitle>Mock Credentials</CardTitle>
-              <CardDescription>Use any seeded account for quick access.</CardDescription>
+              <CardDescription>Use any role-based account for quick access.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
-              <div className="rounded-md border border-border bg-muted/40 p-3">
-                <p className="font-medium">Physician</p>
-                <p className="text-muted-foreground">Email: e.chen@hospital.org</p>
-                <p className="text-muted-foreground">Password: demo123</p>
-              </div>
-              <div className="rounded-md border border-border bg-muted/40 p-3">
-                <p className="font-medium">Admin</p>
-                <p className="text-muted-foreground">Email: admin@hospital.org</p>
-                <p className="text-muted-foreground">Password: admin123</p>
-              </div>
+              {SIGN_IN_DEMO_USERS.map((demo) => (
+                <div key={demo.email} className="rounded-md border border-border bg-muted/40 p-3">
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <p className="font-medium">{demo.role}</p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-6 px-2 text-[10px]"
+                      onClick={() => {
+                        setActiveTab("sign-in");
+                        setLoginEmail(demo.email);
+                        setLoginPassword(demo.password);
+                      }}
+                    >
+                      Use
+                    </Button>
+                  </div>
+                  <p className="text-xs text-foreground">{demo.name}</p>
+                  <p className="text-muted-foreground">Email: {demo.email}</p>
+                  <p className="text-muted-foreground">Password: {demo.password}</p>
+                </div>
+              ))}
             </CardContent>
           </Card>
         </div>

@@ -95,6 +95,7 @@ export const MOCK_USERS: User[] = [
   { id: "u6", name: "Admin User", email: "admin@hospital.org", role: "admin", department: "IT", active: true },
   { id: "u7", name: "Sarah Kim", email: "s.kim@hospital.org", role: "triage_nurse", department: "Emergency", active: true },
   { id: "u8", name: "Dr. Marcus Webb", email: "m.webb@hospital.org", role: "physician", department: "ICU", active: false },
+  { id: "u9", name: "Olivia Ross", email: "o.ross@hospital.org", role: "reception", department: "Emergency", active: true },
 ];
 
 export const MOCK_AUTH_CREDENTIALS: AuthCredential[] = [
@@ -105,6 +106,7 @@ export const MOCK_AUTH_CREDENTIALS: AuthCredential[] = [
   { email: "p.nair@hospital.org", password: "demo123", userId: "u5" },
   { email: "admin@hospital.org", password: "admin123", userId: "u6" },
   { email: "s.kim@hospital.org", password: "demo123", userId: "u7" },
+  { email: "o.ross@hospital.org", password: "demo123", userId: "u9" },
 ];
 
 export const MOCK_DEFINITIONS: ProcessDefinition[] = [
@@ -446,6 +448,10 @@ const getFormFieldsForUserTask = (taskName: string, role: Role): FormField[] => 
 };
 
 const getRoleLabel = (role: Role): string => ROLE_LABELS[role];
+const getDefaultAssigneeForRole = (role: Role): string => {
+  const candidate = mockUsersStore.find((user) => user.active && user.role === role);
+  return candidate?.name ?? "Unassigned";
+};
 
 const getOrderedUserTaskNodes = (graph: DesignerGraphPayload) => {
   const outgoingBySource = new Map<string, string[]>();
@@ -809,15 +815,16 @@ export const mockApi = {
     if (payload.nodeType === "userTask") {
       const createdAt = new Date().toISOString();
       const dueAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+      const defaultAssignee = getDefaultAssigneeForRole(payload.assignedRole);
       const createdTask: Task = {
         id: `t-${newNodeId}`,
         nodeId: newNodeId,
         instanceId,
         definitionName: "Emergency Triage",
         name: payload.label,
-        assignee: null,
+        assignee: defaultAssignee,
         role: payload.assignedRole,
-        status: "pending",
+        status: "claimed",
         priority: payload.createdByRole === "reception" ? "high" : "medium",
         createdAt,
         dueAt,
@@ -843,6 +850,17 @@ export const mockApi = {
           nodeId: createdTask.nodeId ?? createdTask.id,
           nodeName: createdTask.name,
           payload: { source: "task_console" },
+        },
+        {
+          id: `ae-${Date.now() + 1}`,
+          instanceId: createdTask.instanceId,
+          timestamp: new Date().toISOString(),
+          actor: defaultAssignee,
+          role: createdTask.role,
+          eventType: "task_claimed",
+          nodeId: createdTask.nodeId ?? createdTask.id,
+          nodeName: createdTask.name,
+          payload: { source: "task_console", autoClaimed: true },
         },
         ...mockAuditStore,
       ];

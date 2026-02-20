@@ -22,14 +22,26 @@ function SlaTimer({ minutesRemaining }: { minutesRemaining: number }) {
   );
 }
 
-function TaskForm({ task, onComplete, onSaveDraft }: { task: Task; onComplete: () => void; onSaveDraft: () => void }) {
+function TaskForm({
+  task,
+  onComplete,
+  onSaveDraft,
+}: {
+  task: Task;
+  onComplete: (redirectRole: Role) => void;
+  onSaveDraft: () => void;
+}) {
   const { toast } = useToast();
   const [values, setValues] = useState<Record<string, string | boolean>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [redirectRole, setRedirectRole] = useState<Role | "">("");
+  const [showRedirectAccordion, setShowRedirectAccordion] = useState(true);
 
   useEffect(() => {
     setValues({});
     setErrors({});
+    setRedirectRole("");
+    setShowRedirectAccordion(true);
   }, [task.id]);
 
   const setFieldValue = (fieldId: string, value: string | boolean) => {
@@ -64,8 +76,12 @@ function TaskForm({ task, onComplete, onSaveDraft }: { task: Task; onComplete: (
       toast({ title: "Missing required fields", description: "Complete all required inputs before submitting.", variant: "destructive" });
       return;
     }
+    if (!redirectRole) {
+      toast({ title: "Redirect role required", description: "Select the next role before completing the task.", variant: "destructive" });
+      return;
+    }
     toast({ title: "Task completed", description: `"${task.name}" has been completed and the process advanced.` });
-    onComplete();
+    onComplete(redirectRole);
   };
 
   return (
@@ -130,6 +146,37 @@ function TaskForm({ task, onComplete, onSaveDraft }: { task: Task; onComplete: (
           {errors[field.id] && <p className="text-[11px] text-destructive">{errors[field.id]}</p>}
         </div>
       ))}
+      <div className="space-y-2 rounded-md border border-border bg-card p-2.5">
+        <button
+          type="button"
+          className="flex w-full items-center justify-between text-left"
+          onClick={() => setShowRedirectAccordion((prev) => !prev)}
+        >
+          <span className="text-xs font-semibold">Redirection Role</span>
+          <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+        </button>
+        {showRedirectAccordion && (
+          <div className="space-y-1.5">
+            <Label className="text-xs font-medium">
+              Select next role
+              <span className="ml-1 text-destructive">*</span>
+            </Label>
+            <Select value={redirectRole || undefined} onValueChange={(value) => setRedirectRole(value as Role)}>
+              <SelectTrigger className="h-8 text-sm">
+                <SelectValue placeholder="Choose role..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="reception">{ROLE_LABELS.reception}</SelectItem>
+                <SelectItem value="triage_nurse">{ROLE_LABELS.triage_nurse}</SelectItem>
+                <SelectItem value="physician">{ROLE_LABELS.physician}</SelectItem>
+                <SelectItem value="lab">{ROLE_LABELS.lab}</SelectItem>
+                <SelectItem value="radiology">{ROLE_LABELS.radiology}</SelectItem>
+                <SelectItem value="admin">{ROLE_LABELS.admin}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+      </div>
       <div className="flex gap-2 pt-2">
         <Button type="submit" size="sm" className="gap-1.5">
           <CheckCircle2 className="h-3.5 w-3.5" />
@@ -201,13 +248,14 @@ function NodeTypePalette({
   selected,
   onSelect,
   onCreate,
+  currentRole,
 }: {
   selected: DesignerGraphPayload["nodes"][number]["type"];
   onSelect: (value: DesignerGraphPayload["nodes"][number]["type"]) => void;
-  onCreate: (assignedRole: Role) => void;
+  onCreate: () => void;
+  currentRole: Role;
 }) {
   const [open, setOpen] = useState(true);
-  const [assignedRole, setAssignedRole] = useState<Role>("triage_nurse");
   const buttonClass = (value: DesignerGraphPayload["nodes"][number]["type"], tint: string) =>
     cn(
       "flex items-center gap-2 rounded-md border px-2.5 py-2 text-xs font-semibold transition-colors",
@@ -254,21 +302,12 @@ function NodeTypePalette({
 
           <div className="space-y-1.5">
             <Label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Assigned Role</Label>
-            <Select value={assignedRole} onValueChange={(value) => setAssignedRole(value as Role)}>
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="reception">{ROLE_LABELS.reception}</SelectItem>
-                <SelectItem value="triage_nurse">{ROLE_LABELS.triage_nurse}</SelectItem>
-                <SelectItem value="physician">{ROLE_LABELS.physician}</SelectItem>
-                <SelectItem value="lab">{ROLE_LABELS.lab}</SelectItem>
-                <SelectItem value="radiology">{ROLE_LABELS.radiology}</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex h-8 items-center rounded-md border border-border bg-muted/40 px-2.5 text-xs font-medium">
+              {ROLE_LABELS[currentRole]}
+            </div>
           </div>
 
-          <Button size="sm" className="h-8 w-full text-xs" onClick={() => onCreate(assignedRole)}>
+          <Button size="sm" className="h-8 w-full text-xs" onClick={onCreate}>
             Create Task
           </Button>
         </div>
@@ -289,7 +328,12 @@ export default function Tasks() {
   const [search, setSearch] = useState("");
   const [showTimeline, setShowTimeline] = useState(false);
   const [selectedNodeType, setSelectedNodeType] = useState<DesignerGraphPayload["nodes"][number]["type"]>("userTask");
-  const selectedTask = tasks.find((task) => task.id === selectedTaskId) ?? null;
+  const currentRole = user?.role ?? "triage_nurse";
+  const visibleTasks = useMemo(
+    () => (currentRole === "admin" ? tasks : tasks.filter((task) => task.role === currentRole)),
+    [currentRole, tasks]
+  );
+  const selectedTask = visibleTasks.find((task) => task.id === selectedTaskId) ?? null;
 
   useEffect(() => {
     if (!hasBootstrapped && !isLoading) {
@@ -299,44 +343,40 @@ export default function Tasks() {
 
   const filtered = useMemo(
     () =>
-      tasks.filter(
+      visibleTasks.filter(
         (t) => t.name.toLowerCase().includes(search.toLowerCase()) || t.patientName.toLowerCase().includes(search.toLowerCase())
       ),
-    [search, tasks]
+    [search, visibleTasks]
   );
 
   useEffect(() => {
-    if (!selectedTaskId && tasks.length > 0) {
-      setSelectedTaskId(tasks[0].id);
+    if (!selectedTaskId && filtered.length > 0) {
+      setSelectedTaskId(filtered[0].id);
       return;
     }
-    if (selectedTaskId && !tasks.some((task) => task.id === selectedTaskId)) {
-      setSelectedTaskId(tasks[0]?.id ?? null);
+    if (selectedTaskId && !filtered.some((task) => task.id === selectedTaskId)) {
+      setSelectedTaskId(filtered[0]?.id ?? null);
     }
-  }, [selectedTaskId, tasks]);
+  }, [filtered, selectedTaskId]);
 
-  const completeTask = async () => {
+  const completeTask = async (redirectRole: Role) => {
     if (!selectedTask) return;
     await dispatch(completeTaskThunk({ taskId: selectedTask.id, actor: user?.name ?? "System" }));
+    setSelectedTaskId(null);
     const createResult = await dispatch(
       createTaskFromConsoleThunk({
         fromNodeId: selectedTask.nodeId ?? null,
         instanceId: selectedTask.instanceId,
         nodeType: selectedNodeType,
         label: getDefaultNodeLabel(selectedNodeType, selectedTask.name),
-        assignedRole: user?.role ?? "triage_nurse",
+        assignedRole: redirectRole,
         createdByRole: user?.role ?? "triage_nurse",
         patientName: selectedTask.patientName,
         patientId: selectedTask.patientId,
         registrationNote: `Auto-generated after completing ${selectedTask.name}`,
       })
     );
-    if (createTaskFromConsoleThunk.fulfilled.match(createResult) && selectedNodeType === "userTask") {
-      const createdTask = createResult.payload.tasks[0];
-      if (createdTask?.id) {
-        await dispatch(claimTaskThunk({ taskId: createdTask.id, assigneeName: user?.name ?? "Unassigned" }));
-      }
-    }
+    if (!createTaskFromConsoleThunk.fulfilled.match(createResult)) return;
     setShowTimeline(false);
   };
 
@@ -348,14 +388,14 @@ export default function Tasks() {
     await dispatch(claimTaskThunk({ taskId: task.id, assigneeName: user?.name ?? "Unassigned" }));
   };
 
-  const createTask = async (assignedRole: Role) => {
+  const createTask = async () => {
     await dispatch(
       createTaskFromConsoleThunk({
         fromNodeId: selectedTask?.nodeId ?? null,
         instanceId: selectedTask?.instanceId ?? null,
         nodeType: selectedNodeType,
         label: getDefaultNodeLabel(selectedNodeType, selectedTask?.name),
-        assignedRole,
+        assignedRole: currentRole,
         createdByRole: user?.role ?? "triage_nurse",
         patientName: selectedTask?.patientName ?? "Generated from Task Console",
         patientId: selectedTask?.patientId ?? "P-NEW",
@@ -427,7 +467,12 @@ export default function Tasks() {
             </div>
           ))}
         </div>
-        <NodeTypePalette selected={selectedNodeType} onSelect={setSelectedNodeType} onCreate={createTask} />
+        <NodeTypePalette
+          selected={selectedNodeType}
+          onSelect={setSelectedNodeType}
+          onCreate={createTask}
+          currentRole={currentRole}
+        />
       </div>
 
       {/* Task Detail */}
