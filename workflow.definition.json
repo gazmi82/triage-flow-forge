@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.1.0",
+  "schemaVersion": "1.2.0",
   "definition": {
     "id": "def.emergency_triage.v5",
     "key": "emergency_triage",
@@ -31,6 +31,7 @@
             "process_designer",
             "task_console",
             "draft",
+            "saved_tasks",
             "instance_monitor",
             "admin"
           ]
@@ -40,7 +41,8 @@
           "allow": [
             "process_designer",
             "task_console",
-            "draft"
+            "draft",
+            "saved_tasks"
           ]
         }
       ]
@@ -63,9 +65,13 @@
           "assignedRole"
         ]
       },
+      "assignedRoleSelection": {
+        "enabled": true,
+        "scope": "all_supported_roles_except_admin"
+      },
       "roleRules": {
         "reception": {
-          "shapeTypeLockedTo": "userTask",
+          "defaultShapeType": "userTask",
           "defaultFields": [
             "patient_name",
             "patient_id",
@@ -79,7 +85,12 @@
       "mode": "read_only_projection",
       "showBpmnElementsPalette": false,
       "showPropertiesPanel": false,
-      "editableFromDesigner": false
+      "editableFromDesigner": false,
+      "taskScopedProjection": {
+        "enabled": true,
+        "scopeKey": "instanceId",
+        "includesAllTasksInInstance": true
+      }
     }
   },
   "stateManagement": {
@@ -89,7 +100,9 @@
       "task_console_create_to_designer": "creating node/task in task console updates designer graph immediately",
       "task_console_claim_complete_to_designer": "task status changes mirror node taskStatus",
       "designer_publish_to_task_console": "publish rebuilds task list from userTask nodes",
-      "draft_save_load": "save stores graph snapshots; load injects snapshot into designer state"
+      "draft_save_load": "save stores graph snapshots; load injects snapshot into designer state",
+      "task_redirect_to_designer": "opening process design from a task loads the graph for that task instanceId",
+      "saved_tasks_registry": "saved tasks keeps all task records with process status and supports process redirection"
     }
   },
   "graph": {

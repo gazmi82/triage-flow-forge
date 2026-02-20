@@ -1,23 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ROLE_LABELS, type AuditEvent, type DesignerGraphPayload, type Role, type Task } from "@/data/mockData";
-import { RoleBadge, PriorityBadge, StatusBadge } from "@/components/ui/Badges";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
-import { cn } from "@/lib/utils";
-import { slaBg, timeAgo, formatTime } from "@/lib/formatters";
+import { RoleBadge, PriorityBadge, StatusBadge, Button, Input, Label, Textarea, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Checkbox } from "@/components/ui";
+import { cn, slaBg, timeAgo, formatTime } from "@/lib";
 import {
   Clock, User, Search, ChevronRight, AlertTriangle,
   CheckCircle2, Activity, Milestone, Circle, Diamond, Square, Mail, ChevronsUpDown
 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { useToast, useAuth } from "@/hooks";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
-import { bootstrapWorkflowThunk, claimTaskThunk, completeTaskThunk, createTaskFromConsoleThunk, openTaskDesignerThunk, saveDraftThunk } from "@/store/slices/workflowSlice";
-import { useAuth } from "@/hooks/use-auth";
+import { bootstrapWorkflowThunk, claimTaskThunk, completeTaskThunk, createTaskFromConsoleThunk, openTaskDesignerThunk, saveDraftThunk } from "@/store/slices";
 
 function SlaTimer({ minutesRemaining }: { minutesRemaining: number }) {
   const abs = Math.abs(minutesRemaining);
@@ -150,7 +142,8 @@ function TaskForm({ task, onComplete, onSaveDraft }: { task: Task; onComplete: (
 }
 
 function AuditTimeline({ instanceId, events }: { instanceId: string; events: AuditEvent[] }) {
-  const instanceEvents = events.filter((e) => e.instanceId === instanceId);
+  const instanceEvents = [...events.filter((e) => e.instanceId === instanceId)]
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
   const iconMap: Record<string, React.ReactNode> = {
     instance_started: <Activity className="h-3.5 w-3.5 text-success" />,
     task_created: <Milestone className="h-3.5 w-3.5 text-info" />,
@@ -166,7 +159,13 @@ function AuditTimeline({ instanceId, events }: { instanceId: string; events: Aud
       {instanceEvents.map((ev, i) => (
         <div key={ev.id} className="flex gap-3">
           <div className="flex flex-col items-center">
-            <div className="flex h-6 w-6 items-center justify-center rounded-full bg-muted border border-border flex-shrink-0">
+            <div className="relative flex h-6 w-6 items-center justify-center rounded-full bg-muted border border-border flex-shrink-0">
+              {i === 0 && (
+                <>
+                  <span className="absolute inline-flex h-5 w-5 animate-ping rounded-full bg-success/35" />
+                  <span className="absolute h-2 w-2 rounded-full bg-success" />
+                </>
+              )}
               {iconMap[ev.eventType] || <Milestone className="h-3.5 w-3.5" />}
             </div>
             {i < instanceEvents.length - 1 && <div className="mt-1 flex-1 w-px bg-border" style={{ minHeight: "16px" }} />}

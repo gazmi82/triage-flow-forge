@@ -4,12 +4,11 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
-import { Sidebar } from "@/components/layout/Sidebar";
-import { TopNavbar } from "@/components/layout/TopNavbar";
-import { useAuth } from "@/hooks/use-auth";
+import { Sidebar, TopNavbar } from "@/components/layout";
+import { useAuth } from "@/hooks";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
-import { bootstrapWorkflowThunk } from "@/store/slices/workflowSlice";
-import { getDefaultRouteForRole, isAdminRole } from "@/lib/permissions";
+import { bootstrapWorkflowThunk } from "@/store/slices";
+import { getDefaultRouteForRole, isAdminRole } from "@/lib";
 
 const Index = lazy(() => import("./pages/Index"));
 const Designer = lazy(() => import("./pages/Designer"));
