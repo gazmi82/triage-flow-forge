@@ -1,9 +1,11 @@
-import { MOCK_INSTANCES } from "@/data/mockData";
 import { StatusBadge, PriorityBadge } from "@/components/ui/Badges";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { timeAgo } from "@/lib/formatters";
 import { Activity, Eye, RotateCcw, AlertCircle, CheckCircle2, Loader2, PauseCircle } from "lucide-react";
+import { useEffect } from "react";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { bootstrapWorkflowThunk } from "@/store/slices/workflowSlice";
 
 const STATUS_ICONS = {
   active: <Loader2 className="h-4 w-4 text-success animate-spin" />,
@@ -13,6 +15,17 @@ const STATUS_ICONS = {
 };
 
 export default function Instances() {
+  const dispatch = useAppDispatch();
+  const instances = useAppSelector((state) => state.workflow.instances);
+  const hasBootstrapped = useAppSelector((state) => state.workflow.hasBootstrapped);
+  const isLoading = useAppSelector((state) => state.workflow.isLoading);
+
+  useEffect(() => {
+    if (!hasBootstrapped && !isLoading) {
+      dispatch(bootstrapWorkflowThunk());
+    }
+  }, [dispatch, hasBootstrapped, isLoading]);
+
   return (
     <div className="h-full overflow-y-auto p-6 space-y-6">
       <div>
@@ -22,11 +35,11 @@ export default function Instances() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 2xl:grid-cols-4">
-        {[
-          { label: "Active", value: MOCK_INSTANCES.filter(i => i.status === "active").length, color: "text-success", bg: "bg-success/10 border-success/30" },
-          { label: "Completed", value: MOCK_INSTANCES.filter(i => i.status === "completed").length, color: "text-muted-foreground", bg: "bg-muted border-border" },
-          { label: "Suspended", value: MOCK_INSTANCES.filter(i => i.status === "suspended").length, color: "text-warning", bg: "bg-warning/10 border-warning/30" },
-          { label: "Error", value: MOCK_INSTANCES.filter(i => i.status === "error").length, color: "text-destructive", bg: "bg-destructive/10 border-destructive/30" },
+          {[
+          { label: "Active", value: instances.filter(i => i.status === "active").length, color: "text-success", bg: "bg-success/10 border-success/30" },
+          { label: "Completed", value: instances.filter(i => i.status === "completed").length, color: "text-muted-foreground", bg: "bg-muted border-border" },
+          { label: "Suspended", value: instances.filter(i => i.status === "suspended").length, color: "text-warning", bg: "bg-warning/10 border-warning/30" },
+          { label: "Error", value: instances.filter(i => i.status === "error").length, color: "text-destructive", bg: "bg-destructive/10 border-destructive/30" },
         ].map((s) => (
           <div key={s.label} className={`rounded-lg border p-4 ${s.bg}`}>
             <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
@@ -40,7 +53,7 @@ export default function Instances() {
         <div className="border-b border-border px-4 py-3 flex items-center gap-2">
           <Activity className="h-4 w-4 text-muted-foreground" />
           <p className="text-sm font-semibold">All Instances</p>
-          <Badge variant="secondary" className="ml-auto text-xs">{MOCK_INSTANCES.length} total</Badge>
+          <Badge variant="secondary" className="ml-auto text-xs">{instances.length} total</Badge>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-xs">
@@ -57,7 +70,7 @@ export default function Instances() {
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {MOCK_INSTANCES.map((inst) => (
+              {instances.map((inst) => (
                 <tr key={inst.id} className="hover:bg-muted/30 transition-colors">
                   <td className="px-4 py-3 font-mono text-[10px] text-muted-foreground">{inst.id}</td>
                   <td className="px-4 py-3 font-medium">{inst.definitionName}</td>

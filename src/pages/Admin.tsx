@@ -1,13 +1,26 @@
-import { useState } from "react";
-import { MOCK_USERS, MOCK_DEFINITIONS, type Role } from "@/data/mockData";
+import { useEffect, useState } from "react";
+import { type Role } from "@/data/mockData";
 import { RoleBadge, StatusBadge } from "@/components/ui/Badges";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { GitBranch, Users, CheckCircle2, XCircle, Plus } from "lucide-react";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { bootstrapWorkflowThunk } from "@/store/slices/workflowSlice";
 
 export default function Admin() {
+  const dispatch = useAppDispatch();
   const [activeTab, setActiveTab] = useState("definitions");
+  const users = useAppSelector((state) => state.workflow.users);
+  const definitions = useAppSelector((state) => state.workflow.definitions);
+  const hasBootstrapped = useAppSelector((state) => state.workflow.hasBootstrapped);
+  const isLoading = useAppSelector((state) => state.workflow.isLoading);
+
+  useEffect(() => {
+    if (!hasBootstrapped && !isLoading) {
+      dispatch(bootstrapWorkflowThunk());
+    }
+  }, [dispatch, hasBootstrapped, isLoading]);
 
   return (
     <div className="h-full overflow-y-auto p-6 space-y-6">
@@ -54,7 +67,7 @@ export default function Admin() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {MOCK_DEFINITIONS.map((def) => (
+                  {definitions.map((def) => (
                     <tr key={def.id} className="hover:bg-muted/30 transition-colors">
                       <td className="px-4 py-3">
                         <div>
@@ -157,7 +170,7 @@ export default function Admin() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {MOCK_USERS.map((user) => (
+                  {users.map((user) => (
                     <tr key={user.id} className="hover:bg-muted/30 transition-colors">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">

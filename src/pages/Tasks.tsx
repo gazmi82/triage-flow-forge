@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { MOCK_TASKS, MOCK_AUDIT, type Task } from "@/data/mockData";
+import { useNavigate } from "react-router-dom";
+import { ROLE_LABELS, type AuditEvent, type DesignerGraphPayload, type Role, type Task } from "@/data/mockData";
 import { RoleBadge, PriorityBadge, StatusBadge } from "@/components/ui/Badges";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,9 +12,12 @@ import { cn } from "@/lib/utils";
 import { slaBg, timeAgo, formatTime } from "@/lib/formatters";
 import {
   Clock, User, Search, ChevronRight, AlertTriangle,
-  CheckCircle2, Activity, Milestone
+  CheckCircle2, Activity, Milestone, Circle, Diamond, Square, Mail, ChevronsUpDown
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { bootstrapWorkflowThunk, claimTaskThunk, completeTaskThunk, createTaskFromConsoleThunk, openTaskDesignerThunk, saveDraftThunk } from "@/store/slices/workflowSlice";
+import { useAuth } from "@/hooks/use-auth";
 
 function SlaTimer({ minutesRemaining }: { minutesRemaining: number }) {
   const abs = Math.abs(minutesRemaining);
@@ -26,7 +30,7 @@ function SlaTimer({ minutesRemaining }: { minutesRemaining: number }) {
   );
 }
 
-function TaskForm({ task, onComplete }: { task: Task; onComplete: () => void }) {
+function TaskForm({ task, onComplete, onSaveDraft }: { task: Task; onComplete: () => void; onSaveDraft: () => void }) {
   const { toast } = useToast();
   const [values, setValues] = useState<Record<string, string | boolean>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -139,14 +143,14 @@ function TaskForm({ task, onComplete }: { task: Task; onComplete: () => void }) 
           <CheckCircle2 className="h-3.5 w-3.5" />
           Complete Task
         </Button>
-        <Button type="button" variant="outline" size="sm">Save Draft</Button>
+        <Button type="button" variant="outline" size="sm" onClick={onSaveDraft}>Save Draft</Button>
       </div>
     </form>
   );
 }
 
-function AuditTimeline({ instanceId }: { instanceId: string }) {
-  const events = MOCK_AUDIT.filter((e) => e.instanceId === instanceId);
+function AuditTimeline({ instanceId, events }: { instanceId: string; events: AuditEvent[] }) {
+  const instanceEvents = events.filter((e) => e.instanceId === instanceId);
   const iconMap: Record<string, React.ReactNode> = {
     instance_started: <Activity className="h-3.5 w-3.5 text-success" />,
     task_created: <Milestone className="h-3.5 w-3.5 text-info" />,
@@ -159,13 +163,13 @@ function AuditTimeline({ instanceId }: { instanceId: string }) {
 
   return (
     <div className="space-y-2">
-      {events.map((ev, i) => (
+      {instanceEvents.map((ev, i) => (
         <div key={ev.id} className="flex gap-3">
           <div className="flex flex-col items-center">
             <div className="flex h-6 w-6 items-center justify-center rounded-full bg-muted border border-border flex-shrink-0">
               {iconMap[ev.eventType] || <Milestone className="h-3.5 w-3.5" />}
             </div>
-            {i < events.length - 1 && <div className="mt-1 flex-1 w-px bg-border" style={{ minHeight: "16px" }} />}
+            {i < instanceEvents.length - 1 && <div className="mt-1 flex-1 w-px bg-border" style={{ minHeight: "16px" }} />}
           </div>
           <div className="pb-3 min-w-0">
             <p className="text-xs font-medium leading-tight capitalize">{ev.eventType.replace(/_/g, " ")}</p>
@@ -178,11 +182,121 @@ function AuditTimeline({ instanceId }: { instanceId: string }) {
   );
 }
 
+const NODE_TYPE_LABELS: Record<DesignerGraphPayload["nodes"][number]["type"], string> = {
+  startEvent: "Start Event",
+  endEvent: "End Event",
+  timerEvent: "Timer Event",
+  messageEvent: "Message Event",
+  signalEvent: "Signal Event",
+  userTask: "User Task",
+  xorGateway: "XOR Gateway",
+  andGateway: "AND Gateway",
+};
+
+const getDefaultNodeLabel = (type: DesignerGraphPayload["nodes"][number]["type"], seed?: string) => {
+  if (seed?.trim()) return `${seed.trim()} Next`;
+  return NODE_TYPE_LABELS[type];
+};
+
+function NodeTypePalette({
+  selected,
+  onSelect,
+  onCreate,
+}: {
+  selected: DesignerGraphPayload["nodes"][number]["type"];
+  onSelect: (value: DesignerGraphPayload["nodes"][number]["type"]) => void;
+  onCreate: (assignedRole: Role) => void;
+}) {
+  const [open, setOpen] = useState(true);
+  const [assignedRole, setAssignedRole] = useState<Role>("triage_nurse");
+  const buttonClass = (value: DesignerGraphPayload["nodes"][number]["type"], tint: string) =>
+    cn(
+      "flex items-center gap-2 rounded-md border px-2.5 py-2 text-xs font-semibold transition-colors",
+      selected === value ? tint : "border-border bg-card hover:bg-muted/50"
+    );
+
+  return (
+    <div className="border-t border-border bg-card p-3">
+      <button
+        className="flex w-full items-center justify-between rounded-md border border-border px-3 py-2 text-xs font-semibold"
+        onClick={() => setOpen((prev) => !prev)}
+      >
+        Shape / Type
+        <ChevronsUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+      </button>
+
+      {open && (
+        <div className="mt-3 space-y-3">
+          <div>
+            <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Events</p>
+            <div className="grid grid-cols-2 gap-2">
+              <button className={buttonClass("startEvent", "border-success/40 bg-success/10 text-success")} onClick={() => onSelect("startEvent")}><Circle className="h-3.5 w-3.5" />Start</button>
+              <button className={buttonClass("endEvent", "border-destructive/40 bg-destructive/10 text-destructive")} onClick={() => onSelect("endEvent")}><Circle className="h-3.5 w-3.5" />End</button>
+              <button className={buttonClass("timerEvent", "border-info/40 bg-info/10 text-info")} onClick={() => onSelect("timerEvent")}><Clock className="h-3.5 w-3.5" />Timer</button>
+              <button className={buttonClass("messageEvent", "border-accent/40 bg-accent/10 text-accent")} onClick={() => onSelect("messageEvent")}><Mail className="h-3.5 w-3.5" />Message</button>
+              <button className={buttonClass("signalEvent", "border-warning/40 bg-warning/10 text-warning")} onClick={() => onSelect("signalEvent")}><AlertTriangle className="h-3.5 w-3.5" />Signal</button>
+            </div>
+          </div>
+
+          <div>
+            <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Tasks</p>
+            <div className="grid grid-cols-2 gap-2">
+              <button className={buttonClass("userTask", "border-primary/40 bg-primary/10 text-primary")} onClick={() => onSelect("userTask")}><Square className="h-3.5 w-3.5" />User Task</button>
+            </div>
+          </div>
+
+          <div>
+            <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Gateways</p>
+            <div className="grid grid-cols-2 gap-2">
+              <button className={buttonClass("xorGateway", "border-node-gateway-xor/40 bg-node-gateway-xor/10 text-node-gateway-xor")} onClick={() => onSelect("xorGateway")}><Diamond className="h-3.5 w-3.5" />XOR</button>
+              <button className={buttonClass("andGateway", "border-node-gateway-and/40 bg-node-gateway-and/10 text-node-gateway-and")} onClick={() => onSelect("andGateway")}><Diamond className="h-3.5 w-3.5" />AND</button>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Assigned Role</Label>
+            <Select value={assignedRole} onValueChange={(value) => setAssignedRole(value as Role)}>
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="reception">{ROLE_LABELS.reception}</SelectItem>
+                <SelectItem value="triage_nurse">{ROLE_LABELS.triage_nurse}</SelectItem>
+                <SelectItem value="physician">{ROLE_LABELS.physician}</SelectItem>
+                <SelectItem value="lab">{ROLE_LABELS.lab}</SelectItem>
+                <SelectItem value="radiology">{ROLE_LABELS.radiology}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Button size="sm" className="h-8 w-full text-xs" onClick={() => onCreate(assignedRole)}>
+            Create Task
+          </Button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Tasks() {
-  const [tasks, setTasks] = useState(MOCK_TASKS);
-  const [selectedTask, setSelectedTask] = useState<Task | null>(tasks[0]);
+  const dispatch = useAppDispatch();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const tasks = useAppSelector((state) => state.workflow.tasks);
+  const audit = useAppSelector((state) => state.workflow.audit);
+  const hasBootstrapped = useAppSelector((state) => state.workflow.hasBootstrapped);
+  const isLoading = useAppSelector((state) => state.workflow.isLoading);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [showTimeline, setShowTimeline] = useState(false);
+  const [selectedNodeType, setSelectedNodeType] = useState<DesignerGraphPayload["nodes"][number]["type"]>("userTask");
+  const selectedTask = tasks.find((task) => task.id === selectedTaskId) ?? null;
+
+  useEffect(() => {
+    if (!hasBootstrapped && !isLoading) {
+      dispatch(bootstrapWorkflowThunk());
+    }
+  }, [dispatch, hasBootstrapped, isLoading]);
 
   const filtered = useMemo(
     () =>
@@ -193,26 +307,73 @@ export default function Tasks() {
   );
 
   useEffect(() => {
-    if (!selectedTask) return;
-    if (!tasks.some((task) => task.id === selectedTask.id)) {
-      setSelectedTask(tasks[0] ?? null);
+    if (!selectedTaskId && tasks.length > 0) {
+      setSelectedTaskId(tasks[0].id);
+      return;
     }
-  }, [selectedTask, tasks]);
+    if (selectedTaskId && !tasks.some((task) => task.id === selectedTaskId)) {
+      setSelectedTaskId(tasks[0]?.id ?? null);
+    }
+  }, [selectedTaskId, tasks]);
 
-  const completeTask = () => {
+  const completeTask = async () => {
     if (!selectedTask) return;
-    setTasks((prev) => prev.filter((t) => t.id !== selectedTask.id));
+    await dispatch(completeTaskThunk({ taskId: selectedTask.id, actor: user?.name ?? "System" }));
+    const createResult = await dispatch(
+      createTaskFromConsoleThunk({
+        fromNodeId: selectedTask.nodeId ?? null,
+        instanceId: selectedTask.instanceId,
+        nodeType: selectedNodeType,
+        label: getDefaultNodeLabel(selectedNodeType, selectedTask.name),
+        assignedRole: user?.role ?? "triage_nurse",
+        createdByRole: user?.role ?? "triage_nurse",
+        patientName: selectedTask.patientName,
+        patientId: selectedTask.patientId,
+        registrationNote: `Auto-generated after completing ${selectedTask.name}`,
+      })
+    );
+    if (createTaskFromConsoleThunk.fulfilled.match(createResult) && selectedNodeType === "userTask") {
+      const createdTask = createResult.payload.tasks[0];
+      if (createdTask?.id) {
+        await dispatch(claimTaskThunk({ taskId: createdTask.id, assigneeName: user?.name ?? "Unassigned" }));
+      }
+    }
+    setShowTimeline(false);
   };
 
-  const claimTask = (task: Task) => {
-    setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: "claimed" as const, assignee: "Dr. Emily Chen" } : t));
-    setSelectedTask(prev => prev?.id === task.id ? { ...prev, status: "claimed", assignee: "Dr. Emily Chen" } : prev);
+  const saveDraft = async () => {
+    await dispatch(saveDraftThunk());
+  };
+
+  const claimTask = async (task: Task) => {
+    await dispatch(claimTaskThunk({ taskId: task.id, assigneeName: user?.name ?? "Unassigned" }));
+  };
+
+  const createTask = async (assignedRole: Role) => {
+    await dispatch(
+      createTaskFromConsoleThunk({
+        fromNodeId: selectedTask?.nodeId ?? null,
+        instanceId: selectedTask?.instanceId ?? null,
+        nodeType: selectedNodeType,
+        label: getDefaultNodeLabel(selectedNodeType, selectedTask?.name),
+        assignedRole,
+        createdByRole: user?.role ?? "triage_nurse",
+        patientName: selectedTask?.patientName ?? "Generated from Task Console",
+        patientId: selectedTask?.patientId ?? "P-NEW",
+        registrationNote: "Created from shape/type accordion",
+      })
+    );
+  };
+
+  const openTaskProcessDesign = async (taskId: string) => {
+    await dispatch(openTaskDesignerThunk({ taskId }));
+    navigate("/designer");
   };
 
   return (
     <div className="flex h-full flex-col md:flex-row">
       {/* Task List */}
-      <div className="flex w-full flex-col border-b border-border bg-card md:w-80 md:min-w-80 md:border-b-0 md:border-r">
+      <div className="flex w-full flex-col border-b border-border bg-card md:w-72 md:min-w-72 md:border-b-0 md:border-r lg:w-80 lg:min-w-80">
         <div className="border-b border-border p-4">
           <h2 className="text-sm font-bold mb-2">My Task Inbox</h2>
           <div className="relative">
@@ -235,17 +396,28 @@ export default function Tasks() {
             </div>
           )}
           {filtered.map((task) => (
-            <button
+            <div
               key={task.id}
-              onClick={() => { setSelectedTask(task); setShowTimeline(false); }}
               className={cn(
-                "w-full text-left px-4 py-3 transition-colors hover:bg-muted/60",
-                selectedTask?.id === task.id && "bg-primary/5 border-l-2 border-l-primary"
+                "w-full px-4 py-3 transition-colors hover:bg-muted/60",
+                selectedTaskId === task.id && "bg-primary/5 border-l-2 border-l-primary"
               )}
             >
               <div className="flex items-start justify-between gap-2 mb-1.5">
-                <p className="text-xs font-semibold leading-tight">{task.name}</p>
-                <SlaTimer minutesRemaining={task.minutesRemaining} />
+                <button onClick={() => { setSelectedTaskId(task.id); setShowTimeline(false); }} className="flex-1 text-left">
+                  <p className="text-xs font-semibold leading-tight">{task.name}</p>
+                </button>
+                <div className="flex items-center gap-2">
+                  <SlaTimer minutesRemaining={task.minutesRemaining} />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-6 px-2 text-[10px]"
+                    onClick={() => openTaskProcessDesign(task.id)}
+                  >
+                    Process
+                  </Button>
+                </div>
               </div>
               <p className="text-[10px] text-muted-foreground mb-1.5">{task.patientName} · {task.patientId}</p>
               <div className="flex items-center gap-1.5 flex-wrap">
@@ -253,17 +425,18 @@ export default function Tasks() {
                 <PriorityBadge priority={task.priority} />
                 <RoleBadge role={task.role} />
               </div>
-            </button>
+            </div>
           ))}
         </div>
+        <NodeTypePalette selected={selectedNodeType} onSelect={setSelectedNodeType} onCreate={createTask} />
       </div>
 
       {/* Task Detail */}
       {selectedTask ? (
         <div className="flex flex-1 flex-col overflow-hidden">
           {/* Header */}
-          <div className="border-b border-border bg-card px-6 py-4">
-            <div className="flex items-start justify-between">
+          <div className="border-b border-border bg-card px-4 py-4 md:px-6">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <h1 className="text-base font-bold">{selectedTask.name}</h1>
@@ -307,7 +480,7 @@ export default function Tasks() {
             <div className="flex-1 overflow-y-auto p-6">
               <p className="mb-4 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Task Form</p>
               <div className="max-w-lg">
-                <TaskForm task={selectedTask} onComplete={completeTask} />
+                <TaskForm task={selectedTask} onComplete={completeTask} onSaveDraft={saveDraft} />
               </div>
             </div>
 
@@ -315,18 +488,21 @@ export default function Tasks() {
             {showTimeline && (
               <div className="w-full border-t border-border overflow-y-auto bg-muted/20 p-4 md:w-72 md:border-l md:border-t-0">
                 <p className="mb-4 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Audit Timeline</p>
-                <AuditTimeline instanceId={selectedTask.instanceId} />
+                <AuditTimeline instanceId={selectedTask.instanceId} events={audit} />
               </div>
             )}
           </div>
         </div>
       ) : (
-        <div className="flex flex-1 items-center justify-center text-center">
-          <div>
-            <CheckCircle2 className="mx-auto mb-3 h-10 w-10 text-success" />
-            <p className="font-semibold">No task selected</p>
-            <p className="text-sm text-muted-foreground">Select a task from the inbox to view details</p>
+        <div className="flex flex-1 flex-col overflow-y-auto">
+          <div className="border-b border-border bg-card px-4 py-4 md:px-6">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-success" />
+              <p className="text-base font-semibold">No task selected</p>
+            </div>
+            <p className="text-sm text-muted-foreground">Create tasks from the shape/type accordion in the left panel.</p>
           </div>
+          <div className="flex-1" />
         </div>
       )}
     </div>

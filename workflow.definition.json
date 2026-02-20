@@ -1,178 +1,102 @@
 {
-  "schemaVersion": "1.0.0",
+  "schemaVersion": "1.1.0",
   "definition": {
-    "id": "def.emergency_triage.v4",
+    "id": "def.emergency_triage.v5",
     "key": "emergency_triage",
     "name": "Emergency Triage",
-    "version": 4,
+    "version": 5,
     "status": "draft",
-    "description": "Design and publish BPMN process definitions for emergency triage.",
+    "description": "Task Console is the entry point. Process Designer is a read-only projection of task-created nodes.",
     "lanes": [
       "reception",
       "triage_nurse",
-      "physician"
+      "physician",
+      "lab",
+      "radiology"
     ],
-    "slaPolicy": {
-      "defaultTaskDueInMinutes": 30,
-      "warnThresholdMinutes": 15
+    "accessControl": {
+      "roles": [
+        "admin",
+        "reception",
+        "triage_nurse",
+        "physician",
+        "lab",
+        "radiology"
+      ],
+      "routePermissions": [
+        {
+          "role": "admin",
+          "allow": [
+            "dashboard",
+            "process_designer",
+            "task_console",
+            "draft",
+            "instance_monitor",
+            "admin"
+          ]
+        },
+        {
+          "role": "non_admin",
+          "allow": [
+            "process_designer",
+            "task_console",
+            "draft"
+          ]
+        }
+      ]
     }
   },
-  "ui": {
-    "navigation": {
-      "topNavbar": {
+  "uxContract": {
+    "taskConsole": {
+      "isProcessEntryPoint": true,
+      "createTaskButton": {
         "enabled": true,
-        "height": 56,
-        "showsRouteTitle": true,
-        "showsSessionBadge": true,
-        "userMenu": {
-          "trigger": {
-            "showsAvatar": true,
-            "showsName": true,
-            "showsEmail": true
-          },
-          "items": [
-            { "id": "profile", "label": "Profile", "kind": "action" },
-            { "id": "settings", "label": "Settings", "kind": "route", "to": "/admin" },
-            { "id": "account", "label": "Account", "kind": "action" },
-            { "id": "sign_out", "label": "Sign out", "kind": "auth" }
-          ]
+        "createsNodeInGraph": true,
+        "linkFromSelectedTaskNode": true,
+        "ifGraphEmpty": "auto_create_start_event_then_link"
+      },
+      "propertiesPanel": {
+        "location": "task_console_only",
+        "fields": [
+          "shapeType",
+          "label",
+          "assignedRole"
+        ]
+      },
+      "roleRules": {
+        "reception": {
+          "shapeTypeLockedTo": "userTask",
+          "defaultFields": [
+            "patient_name",
+            "patient_id",
+            "registration_note"
+          ],
+          "mustChooseRedirectRole": true
         }
       }
     },
-    "canvas": {
-      "fitView": true,
-      "background": {
-        "variant": "dots",
-        "gap": 20,
-        "size": 1
-      }
+    "processDesigner": {
+      "mode": "read_only_projection",
+      "showBpmnElementsPalette": false,
+      "showPropertiesPanel": false,
+      "editableFromDesigner": false
+    }
+  },
+  "stateManagement": {
+    "driver": "redux_toolkit",
+    "sourceOfTruth": "mockData_api",
+    "syncRules": {
+      "task_console_create_to_designer": "creating node/task in task console updates designer graph immediately",
+      "task_console_claim_complete_to_designer": "task status changes mirror node taskStatus",
+      "designer_publish_to_task_console": "publish rebuilds task list from userTask nodes",
+      "draft_save_load": "save stores graph snapshots; load injects snapshot into designer state"
     }
   },
   "graph": {
-    "startNodeId": "start1",
-    "nodes": [
-      {
-        "id": "start1",
-        "type": "startEvent",
-        "label": "Patient Arrival",
-        "position": { "x": 80, "y": 200 }
-      },
-      {
-        "id": "task1",
-        "type": "userTask",
-        "label": "Registration",
-        "role": {
-          "key": "reception",
-          "label": "Reception"
-        },
-        "position": { "x": 220, "y": 175 },
-        "form": {
-          "fields": [
-            { "id": "patient_name", "label": "Patient Name", "type": "text", "required": true },
-            { "id": "patient_id", "label": "Patient ID", "type": "text", "required": true },
-            { "id": "chief_complaint", "label": "Chief Complaint", "type": "textarea", "required": false }
-          ]
-        }
-      },
-      {
-        "id": "task2",
-        "type": "userTask",
-        "label": "Triage Assessment",
-        "role": {
-          "key": "triage_nurse",
-          "label": "Triage Nurse"
-        },
-        "position": { "x": 420, "y": 175 },
-        "form": {
-          "fields": [
-            { "id": "bp_sys", "label": "Blood Pressure (Systolic)", "type": "number", "required": true },
-            { "id": "bp_dia", "label": "Blood Pressure (Diastolic)", "type": "number", "required": true },
-            { "id": "heart_rate", "label": "Heart Rate (bpm)", "type": "number", "required": true },
-            { "id": "temp", "label": "Temperature (°C)", "type": "number", "required": true },
-            { "id": "spo2", "label": "SpO2 (%)", "type": "number", "required": true }
-          ]
-        }
-      },
-      {
-        "id": "gw1",
-        "type": "xorGateway",
-        "label": "Severity?",
-        "position": { "x": 620, "y": 188 }
-      },
-      {
-        "id": "task3",
-        "type": "userTask",
-        "label": "Fast Track",
-        "role": {
-          "key": "triage_nurse",
-          "label": "Triage Nurse"
-        },
-        "position": { "x": 730, "y": 120 }
-      },
-      {
-        "id": "task4",
-        "type": "userTask",
-        "label": "Physician Assessment",
-        "role": {
-          "key": "physician",
-          "label": "Physician"
-        },
-        "position": { "x": 730, "y": 260 },
-        "form": {
-          "fields": [
-            { "id": "diagnosis", "label": "Primary Diagnosis", "type": "text", "required": true },
-            { "id": "severity", "label": "Severity Level", "type": "select", "required": true, "options": ["1 - Critical", "2 - Emergent", "3 - Urgent", "4 - Less Urgent", "5 - Non-Urgent"] },
-            { "id": "notes", "label": "Clinical Notes", "type": "textarea", "required": false },
-            { "id": "admit", "label": "Admit to Hospital", "type": "boolean", "required": true }
-          ]
-        }
-      },
-      {
-        "id": "timer1",
-        "type": "timerEvent",
-        "label": "SLA 30min",
-        "position": { "x": 620, "y": 350 },
-        "timer": {
-          "durationISO8601": "PT30M"
-        }
-      },
-      {
-        "id": "msg1",
-        "type": "messageEvent",
-        "label": "Lab Result",
-        "position": { "x": 880, "y": 200 },
-        "message": {
-          "name": "LabResultReceived"
-        }
-      },
-      {
-        "id": "gw2",
-        "type": "andGateway",
-        "label": "",
-        "position": { "x": 980, "y": 190 }
-      },
-      {
-        "id": "end1",
-        "type": "endEvent",
-        "label": "Discharged",
-        "position": { "x": 1100, "y": 200 }
-      }
-    ],
-    "edges": [
-      { "id": "e1", "source": "start1", "target": "task1", "style": { "kind": "default" } },
-      { "id": "e2", "source": "task1", "target": "task2", "style": { "kind": "default" } },
-      { "id": "e3", "source": "task2", "target": "gw1", "style": { "kind": "default" } },
-      { "id": "e4", "source": "gw1", "target": "task3", "label": "Minor", "style": { "kind": "gateway" } },
-      { "id": "e5", "source": "gw1", "target": "task4", "label": "Critical", "style": { "kind": "gateway" } },
-      { "id": "e6", "source": "timer1", "target": "task4", "label": "Escalate", "style": { "kind": "timer", "dashed": true } },
-      { "id": "e7", "source": "task3", "target": "gw2", "style": { "kind": "default" } },
-      { "id": "e8", "source": "task4", "target": "gw2", "style": { "kind": "default" } },
-      { "id": "e9", "source": "msg1", "target": "gw2", "style": { "kind": "message" } },
-      { "id": "e10", "source": "gw2", "target": "end1", "style": { "kind": "default" } }
-    ]
-  },
-  "runtime": {
-    "engine": "definition-service",
+    "initialState": {
+      "nodes": [],
+      "edges": []
+    },
     "supportedNodeTypes": [
       "startEvent",
       "endEvent",
@@ -182,10 +106,6 @@
       "timerEvent",
       "messageEvent",
       "signalEvent"
-    ],
-    "retryPolicy": {
-      "maxRetries": 3,
-      "backoff": "exponential"
-    }
+    ]
   }
 }

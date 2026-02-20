@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { useToast } from "@/hooks/use-toast";
+import { getRouteTitle, isAdminRole } from "@/lib/permissions";
 import {
   Bell,
   CircleUserRound,
@@ -19,14 +20,6 @@ import {
   Settings,
   UserRound,
 } from "lucide-react";
-
-const ROUTE_TITLES: Record<string, string> = {
-  "/": "Dashboard",
-  "/designer": "Process Designer",
-  "/tasks": "Task Console",
-  "/instances": "Instance Monitor",
-  "/admin": "Administration",
-};
 
 export function TopNavbar() {
   const location = useLocation();
@@ -45,7 +38,8 @@ export function TopNavbar() {
     [user],
   );
 
-  const title = ROUTE_TITLES[location.pathname] ?? "HospitalBPM";
+  const title = getRouteTitle(location.pathname);
+  const isAdmin = isAdminRole(user?.role);
 
   const showNotImplemented = (label: string) => {
     toast({
@@ -109,10 +103,12 @@ export function TopNavbar() {
               <UserRound className="mr-2 h-4 w-4" />
               Profile
             </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => navigate("/admin")}>
-              <Settings className="mr-2 h-4 w-4" />
-              Settings
-            </DropdownMenuItem>
+            {isAdmin && (
+              <DropdownMenuItem onSelect={() => navigate("/admin")}>
+                <Settings className="mr-2 h-4 w-4" />
+                Settings
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onSelect={() => showNotImplemented("Account")}>
               <CircleUserRound className="mr-2 h-4 w-4" />
               Account

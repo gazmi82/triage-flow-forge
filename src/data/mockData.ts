@@ -44,6 +44,7 @@ export interface ProcessInstance {
 
 export interface Task {
   id: string;
+  nodeId?: string;
   instanceId: string;
   definitionName: string;
   name: string;
@@ -58,6 +59,11 @@ export interface Task {
   patientName: string;
   patientId: string;
   formFields: FormField[];
+  updatedAt?: string;
+}
+
+export interface SavedTaskRecord extends Task {
+  processStatus: "open" | "closed";
 }
 
 export interface FormField {
@@ -245,4 +251,671 @@ export const ROLE_COLORS: Record<Role, string> = {
   lab: "bg-warning/15 text-warning border-warning/30",
   radiology: "bg-node-gateway-and/10 text-node-gateway-and border-node-gateway-and/20",
   admin: "bg-muted text-muted-foreground border-border",
+};
+
+export interface AuthPayload {
+  id: string;
+  name: string;
+  email: string;
+  role: Role;
+  department: string;
+}
+
+export interface DesignerGraphPayload {
+  nodes: Array<{
+    id: string;
+    type: string;
+    position: { x: number; y: number };
+    width?: number;
+    height?: number;
+    style?: Record<string, string | number>;
+    data: { label?: string; role?: string; taskStatus?: "pending" | "claimed" | "completed" };
+  }>;
+  edges: Array<{
+    id: string;
+    source: string;
+    target: string;
+    label?: string;
+    markerEnd?: { type: string };
+    style?: Record<string, string | number>;
+  }>;
+}
+
+export interface DraftRecord {
+  id: string;
+  name: string;
+  version: number;
+  savedAt: string;
+  graph: DesignerGraphPayload;
+}
+
+export interface CreateTaskFromConsolePayload {
+  fromNodeId?: string | null;
+  instanceId?: string | null;
+  nodeType: DesignerGraphPayload["nodes"][number]["type"];
+  label: string;
+  assignedRole: Role;
+  createdByRole: Role;
+  patientName?: string;
+  patientId?: string;
+  registrationNote?: string;
+}
+
+const deepClone = <T,>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+const sleep = (ms = 150) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const INITIAL_DESIGNER_GRAPH: DesignerGraphPayload = {
+  nodes: [],
+  edges: [],
+};
+
+let mockUsersStore = deepClone(MOCK_USERS);
+const mockDefinitionsStore = deepClone(MOCK_DEFINITIONS);
+let mockInstancesStore = deepClone(MOCK_INSTANCES);
+let mockTasksStore: Task[] = [];
+let mockAuditStore = deepClone(MOCK_AUDIT);
+let mockCredentialsStore = deepClone(MOCK_AUTH_CREDENTIALS);
+let mockDesignerGraphStore = deepClone(INITIAL_DESIGNER_GRAPH);
+let mockDraftsStore: DraftRecord[] = [];
+let mockSavedTasksStore: SavedTaskRecord[] = [];
+const buildInstanceDesignerGraph = (instanceTasks: SavedTaskRecord[]): DesignerGraphPayload => {
+  const ordered = [...instanceTasks].sort(
+    (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
+  );
+  if (ordered.length === 0) {
+    return deepClone(INITIAL_DESIGNER_GRAPH);
+  }
+
+  const startX = 80;
+  const taskStartX = 260;
+  const taskY = 150;
+  const taskSpacingX = 300;
+  const endPaddingX = 140;
+
+  const nodes: DesignerGraphPayload["nodes"] = [
+    { id: `start-${ordered[0].instanceId}`, type: "startEvent", position: { x: startX, y: 180 }, width: 40, height: 40, style: { width: 40, height: 40 }, data: { label: "Start" } },
+  ];
+  const edges: DesignerGraphPayload["edges"] = [];
+
+  ordered.forEach((task, index) => {
+    const nodeId = task.nodeId ?? `node-${task.id}`;
+    nodes.push({
+      id: nodeId,
+      type: "userTask",
+      position: { x: taskStartX + index * taskSpacingX, y: taskY },
+      width: 220,
+      height: 110,
+      style: { width: 220, height: 110 },
+      data: {
+        label: task.name,
+        role: ROLE_LABELS[task.role],
+        taskStatus: task.status === "completed" ? "completed" : task.status === "claimed" ? "claimed" : "pending",
+      },
+    });
+  });
+
+  const endId = `end-${ordered[0].instanceId}`;
+  const endX = taskStartX + ordered.length * taskSpacingX + endPaddingX;
+  nodes.push({ id: endId, type: "endEvent", position: { x: endX, y: 180 }, width: 40, height: 40, style: { width: 40, height: 40 }, data: { label: "End" } });
+
+  const startId = `start-${ordered[0].instanceId}`;
+  edges.push({
+    id: `edge-${startId}-${ordered[0].id}`,
+    source: startId,
+    target: ordered[0].nodeId ?? `node-${ordered[0].id}`,
+    markerEnd: { type: "arrowclosed" },
+    style: { stroke: "hsl(220,68%,30%)" },
+  });
+
+  for (let i = 0; i < ordered.length - 1; i += 1) {
+    edges.push({
+      id: `edge-${ordered[i].id}-${ordered[i + 1].id}`,
+      source: ordered[i].nodeId ?? `node-${ordered[i].id}`,
+      target: ordered[i + 1].nodeId ?? `node-${ordered[i + 1].id}`,
+      markerEnd: { type: "arrowclosed" },
+      style: { stroke: "hsl(220,68%,30%)" },
+    });
+  }
+
+  edges.push({
+    id: `edge-${ordered[ordered.length - 1].id}-${endId}`,
+    source: ordered[ordered.length - 1].nodeId ?? `node-${ordered[ordered.length - 1].id}`,
+    target: endId,
+    markerEnd: { type: "arrowclosed" },
+    style: { stroke: "hsl(220,68%,30%)" },
+  });
+
+  return { nodes, edges };
+};
+
+const upsertSavedTask = (task: Task, processStatus: "open" | "closed") => {
+  const next: SavedTaskRecord = {
+    ...task,
+    updatedAt: task.updatedAt ?? new Date().toISOString(),
+    processStatus,
+  };
+  const existingIndex = mockSavedTasksStore.findIndex((item) => item.id === task.id);
+  if (existingIndex >= 0) {
+    mockSavedTasksStore[existingIndex] = next;
+    return;
+  }
+  mockSavedTasksStore = [next, ...mockSavedTasksStore];
+};
+
+const roleLabelToKey = (value: string | undefined): Role => {
+  const normalized = (value ?? "").trim().toLowerCase();
+  if (normalized === "reception") return "reception";
+  if (normalized === "triage nurse") return "triage_nurse";
+  if (normalized === "physician") return "physician";
+  if (normalized === "laboratory" || normalized === "lab") return "lab";
+  if (normalized === "radiology") return "radiology";
+  return "triage_nurse";
+};
+
+const getFormFieldsForUserTask = (taskName: string, role: Role): FormField[] => {
+  const normalized = taskName.trim().toLowerCase();
+
+  if (normalized.includes("assessment") && role === "physician") {
+    return [
+      { id: "diagnosis", label: "Primary Diagnosis", type: "text", required: true },
+      { id: "severity", label: "Severity Level", type: "select", required: true, options: ["Critical", "High", "Medium", "Low"] },
+      { id: "admit", label: "Admit to Hospital", type: "boolean", required: true },
+      { id: "notes", label: "Clinical Notes", type: "textarea", required: false },
+    ];
+  }
+
+  if (normalized.includes("triage") || role === "triage_nurse") {
+    return [
+      { id: "vitals", label: "Vital Signs Summary", type: "textarea", required: true },
+      { id: "urgency", label: "Urgency", type: "select", required: true, options: ["Critical", "Urgent", "Standard"] },
+      { id: "notes", label: "Nurse Notes", type: "textarea", required: false },
+    ];
+  }
+
+  if (normalized.includes("registration") || role === "reception") {
+    return [
+      { id: "patient_name", label: "Patient Name", type: "text", required: true },
+      { id: "patient_id", label: "Patient ID", type: "text", required: true },
+      { id: "notes", label: "Registration Notes", type: "textarea", required: false },
+    ];
+  }
+
+  return [
+    { id: "notes", label: "Execution Notes", type: "textarea", required: false },
+  ];
+};
+
+const getRoleLabel = (role: Role): string => ROLE_LABELS[role];
+
+const getOrderedUserTaskNodes = (graph: DesignerGraphPayload) => {
+  const outgoingBySource = new Map<string, string[]>();
+  graph.edges.forEach((edge) => {
+    const list = outgoingBySource.get(edge.source) ?? [];
+    list.push(edge.target);
+    outgoingBySource.set(edge.source, list);
+  });
+
+  const startNodeIds = graph.nodes
+    .filter((node) => node.type === "startEvent")
+    .map((node) => node.id);
+  const seedNodeIds = startNodeIds.length > 0 ? startNodeIds : graph.nodes.map((node) => node.id).slice(0, 1);
+
+  const seen = new Set<string>();
+  const queue = [...seedNodeIds];
+  const orderedUserTasks: DesignerGraphPayload["nodes"] = [];
+
+  while (queue.length > 0) {
+    const nextId = queue.shift();
+    if (!nextId || seen.has(nextId)) continue;
+    seen.add(nextId);
+    const node = graph.nodes.find((item) => item.id === nextId);
+    if (!node) continue;
+
+    if (node.type === "userTask" && typeof node.data?.label === "string" && node.data.label.length > 0) {
+      orderedUserTasks.push(node);
+    }
+
+    const outgoing = outgoingBySource.get(node.id) ?? [];
+    queue.push(...outgoing);
+  }
+
+  return orderedUserTasks;
+};
+
+const syncEmergencyTriageTasksFromDesigner = () => {
+  const triageUserTasks = getOrderedUserTaskNodes(mockDesignerGraphStore);
+  const generatedEmergencyTasks: Task[] = triageUserTasks.map((node, index) => {
+    const now = Date.now();
+    const due = new Date(now + (index + 1) * 15 * 60 * 1000).toISOString();
+    const role = roleLabelToKey(node.data.role);
+
+    return {
+      id: `t-${node.id}`,
+      nodeId: node.id,
+      instanceId: "pi-designer-001",
+      definitionName: "Emergency Triage",
+      name: node.data.label ?? "User Task",
+      assignee: null,
+      role,
+      status: "pending",
+      priority: index === 0 ? "high" : "medium",
+      createdAt: new Date(now).toISOString(),
+      dueAt: due,
+      slaMinutes: 30,
+      minutesRemaining: 30 - index * 2,
+      patientName: "Generated from Designer",
+      patientId: `P-DES-${String(index + 1).padStart(3, "0")}`,
+      formFields: getFormFieldsForUserTask(node.data.label ?? "User Task", role),
+    };
+  });
+
+  mockTasksStore = generatedEmergencyTasks;
+  mockSavedTasksStore = generatedEmergencyTasks.map((task) => ({
+    ...task,
+    updatedAt: task.updatedAt ?? new Date().toISOString(),
+    processStatus: "open" as const,
+  }));
+
+  mockInstancesStore = mockInstancesStore.map((instance) => {
+    if (instance.definitionName !== "Emergency Triage") return instance;
+    return {
+      ...instance,
+      currentNode: triageUserTasks[0]?.data.label ?? "No Active User Task",
+    };
+  });
+
+  if (!mockInstancesStore.some((instance) => instance.id === "pi-designer-001")) {
+    mockInstancesStore = [
+      ...mockInstancesStore,
+      {
+        id: "pi-designer-001",
+        definitionId: "def1",
+        definitionName: "Emergency Triage",
+        status: "active",
+        startedAt: new Date().toISOString(),
+        startedBy: "System",
+        currentNode: triageUserTasks[0]?.data.label ?? "No Active User Task",
+        priority: "medium",
+        patientId: "P-DES-ROOT",
+        patientName: "Designer Sandbox",
+      },
+    ];
+  }
+
+  const taskStatusByNodeId = new Map<string, Task["status"]>(
+    generatedEmergencyTasks.map((task) => [task.nodeId ?? "", task.status])
+  );
+  mockDesignerGraphStore = {
+    ...mockDesignerGraphStore,
+    nodes: mockDesignerGraphStore.nodes.map((node) =>
+      node.type === "userTask"
+        ? {
+            ...node,
+            data: {
+              ...node.data,
+              taskStatus: taskStatusByNodeId.get(node.id) ?? "completed",
+            },
+          }
+        : node
+    ),
+  };
+};
+
+const toAuthPayload = (user: User): AuthPayload => ({
+  id: user.id,
+  name: user.name,
+  email: user.email,
+  role: user.role,
+  department: user.department,
+});
+
+export const mockApi = {
+  async fetchUsers(): Promise<User[]> {
+    await sleep();
+    return deepClone(mockUsersStore);
+  },
+
+  async fetchDefinitions(): Promise<ProcessDefinition[]> {
+    await sleep();
+    return deepClone(mockDefinitionsStore);
+  },
+
+  async fetchInstances(): Promise<ProcessInstance[]> {
+    await sleep();
+    return deepClone(mockInstancesStore);
+  },
+
+  async fetchTasks(): Promise<Task[]> {
+    await sleep();
+    return deepClone(mockTasksStore);
+  },
+
+  async fetchSavedTasks(): Promise<SavedTaskRecord[]> {
+    await sleep();
+    return deepClone(mockSavedTasksStore);
+  },
+
+  async fetchAudit(): Promise<AuditEvent[]> {
+    await sleep();
+    return deepClone(mockAuditStore);
+  },
+
+  async fetchDesignerGraph(): Promise<DesignerGraphPayload> {
+    await sleep();
+    return deepClone(mockDesignerGraphStore);
+  },
+
+  async fetchTaskDesignerGraph(taskId: string): Promise<DesignerGraphPayload> {
+    await sleep();
+    const task = mockSavedTasksStore.find((item) => item.id === taskId) ?? mockTasksStore.find((item) => item.id === taskId);
+    if (!task) {
+      return deepClone(INITIAL_DESIGNER_GRAPH);
+    }
+    const instanceTasks = mockSavedTasksStore.filter((item) => item.instanceId === task.instanceId);
+    return buildInstanceDesignerGraph(instanceTasks);
+  },
+
+  async fetchDrafts(): Promise<DraftRecord[]> {
+    await sleep();
+    return deepClone(mockDraftsStore);
+  },
+
+  async saveDraft(payload: DesignerGraphPayload): Promise<{ graph: DesignerGraphPayload; drafts: DraftRecord[] }> {
+    await sleep();
+    mockDesignerGraphStore = deepClone(payload);
+    const nextVersion = mockDraftsStore.length + 1;
+    const draft: DraftRecord = {
+      id: `draft-${Date.now()}`,
+      name: "Emergency Triage",
+      version: nextVersion,
+      savedAt: new Date().toISOString(),
+      graph: deepClone(payload),
+    };
+    mockDraftsStore = [draft, ...mockDraftsStore];
+    return {
+      graph: deepClone(mockDesignerGraphStore),
+      drafts: deepClone(mockDraftsStore),
+    };
+  },
+
+  async publishDesignerGraph(payload: DesignerGraphPayload): Promise<{ graph: DesignerGraphPayload; tasks: Task[]; instances: ProcessInstance[] }> {
+    await sleep();
+    mockDesignerGraphStore = deepClone(payload);
+    syncEmergencyTriageTasksFromDesigner();
+    return {
+      graph: deepClone(mockDesignerGraphStore),
+      tasks: deepClone(mockTasksStore),
+      instances: deepClone(mockInstancesStore),
+    };
+  },
+
+  async claimTask(taskId: string, assigneeName: string): Promise<{ tasks: Task[]; savedTasks: SavedTaskRecord[]; graph: DesignerGraphPayload; instances: ProcessInstance[]; audit: AuditEvent[] }> {
+    await sleep();
+    const now = new Date().toISOString();
+    mockTasksStore = mockTasksStore.map((task) =>
+      task.id === taskId ? { ...task, status: "claimed", assignee: assigneeName, updatedAt: now } : task
+    );
+
+    const task = mockTasksStore.find((item) => item.id === taskId);
+    if (task?.nodeId) {
+      mockDesignerGraphStore = {
+        ...mockDesignerGraphStore,
+        nodes: mockDesignerGraphStore.nodes.map((node) =>
+          node.id === task.nodeId
+            ? { ...node, data: { ...node.data, taskStatus: "claimed" } }
+            : node
+        ),
+      };
+
+      mockAuditStore = [
+        {
+          id: `ae-${Date.now()}`,
+          instanceId: task.instanceId,
+          timestamp: new Date().toISOString(),
+          actor: assigneeName,
+          role: task.role,
+          eventType: "task_claimed",
+          nodeId: task.nodeId,
+          nodeName: task.name,
+          payload: { source: "task_console" },
+        },
+        ...mockAuditStore,
+      ];
+
+      upsertSavedTask(task, "open");
+    }
+
+    return {
+      tasks: deepClone(mockTasksStore),
+      savedTasks: deepClone(mockSavedTasksStore),
+      graph: deepClone(mockDesignerGraphStore),
+      instances: deepClone(mockInstancesStore),
+      audit: deepClone(mockAuditStore),
+    };
+  },
+
+  async completeTask(taskId: string, actor: string): Promise<{ tasks: Task[]; savedTasks: SavedTaskRecord[]; audit: AuditEvent[]; graph: DesignerGraphPayload; instances: ProcessInstance[] }> {
+    await sleep();
+    const completed = mockTasksStore.find((task) => task.id === taskId);
+    mockTasksStore = mockTasksStore.filter((task) => task.id !== taskId);
+
+    if (completed) {
+      if (completed.nodeId) {
+        mockDesignerGraphStore = {
+          ...mockDesignerGraphStore,
+          nodes: mockDesignerGraphStore.nodes.map((node) =>
+            node.id === completed.nodeId
+              ? { ...node, data: { ...node.data, taskStatus: "completed" } }
+              : node
+          ),
+        };
+      }
+      mockAuditStore = [
+        {
+          id: `ae-${Date.now()}`,
+          instanceId: completed.instanceId,
+          timestamp: new Date().toISOString(),
+          actor,
+          role: completed.role,
+          eventType: "task_completed",
+          nodeId: completed.id,
+          nodeName: completed.name,
+          payload: { source: "task_console" },
+        },
+        ...mockAuditStore,
+      ];
+      upsertSavedTask({ ...completed, status: "completed", updatedAt: new Date().toISOString() }, "closed");
+
+      mockInstancesStore = mockInstancesStore.map((instance) => {
+        if (instance.id !== completed.instanceId) return instance;
+        const nextTask = mockTasksStore.find((task) => task.instanceId === completed.instanceId);
+        return {
+          ...instance,
+          currentNode: nextTask?.name ?? "Completed",
+          status: nextTask ? "active" : "completed",
+        };
+      });
+    }
+
+    return {
+      tasks: deepClone(mockTasksStore),
+      savedTasks: deepClone(mockSavedTasksStore),
+      audit: deepClone(mockAuditStore),
+      graph: deepClone(mockDesignerGraphStore),
+      instances: deepClone(mockInstancesStore),
+    };
+  },
+
+  async createTaskFromConsole(payload: CreateTaskFromConsolePayload): Promise<{ tasks: Task[]; savedTasks: SavedTaskRecord[]; graph: DesignerGraphPayload; instances: ProcessInstance[]; audit: AuditEvent[] }> {
+    await sleep();
+    const timestamp = Date.now();
+    const instanceId = payload.instanceId && payload.instanceId.trim().length > 0 ? payload.instanceId : `pi-flow-${timestamp}`;
+    const newNodeId = `node-${timestamp}`;
+    const hasNodes = mockDesignerGraphStore.nodes.length > 0;
+    const startNode = mockDesignerGraphStore.nodes.find((node) => node.type === "startEvent");
+    const sourceNodeId = payload.fromNodeId && mockDesignerGraphStore.nodes.some((n) => n.id === payload.fromNodeId)
+      ? payload.fromNodeId
+      : startNode?.id;
+
+    const newNode = {
+      id: newNodeId,
+      type: payload.nodeType,
+      position: {
+        x: 220 + mockDesignerGraphStore.nodes.length * 90,
+        y: 180 + (mockDesignerGraphStore.nodes.length % 3) * 80,
+      },
+      width: payload.nodeType === "userTask" ? 220 : 40,
+      height: payload.nodeType === "userTask" ? 110 : 40,
+      style: { width: payload.nodeType === "userTask" ? 220 : 40, height: payload.nodeType === "userTask" ? 110 : 40 },
+      data: {
+        label: payload.label,
+        role: getRoleLabel(payload.assignedRole),
+        taskStatus: payload.nodeType === "userTask" ? "pending" as const : undefined,
+      },
+    };
+
+    const nodesToAdd: DesignerGraphPayload["nodes"] = [];
+    if (!hasNodes && payload.nodeType !== "startEvent") {
+      nodesToAdd.push({
+        id: "start-root",
+        type: "startEvent",
+        position: { x: 80, y: 200 },
+        width: 40,
+        height: 40,
+        style: { width: 40, height: 40 },
+        data: { label: "Start" },
+      });
+    }
+    nodesToAdd.push(newNode);
+
+    const edgesToAdd: DesignerGraphPayload["edges"] = [];
+    const resolvedSource = sourceNodeId ?? (nodesToAdd.find((n) => n.id === "start-root")?.id ?? null);
+    if (resolvedSource && resolvedSource !== newNodeId) {
+      edgesToAdd.push({
+        id: `edge-${timestamp}`,
+        source: resolvedSource,
+        target: newNodeId,
+        markerEnd: { type: "arrowclosed" },
+        style: { stroke: "hsl(220,68%,30%)" },
+      });
+    }
+
+    mockDesignerGraphStore = {
+      ...mockDesignerGraphStore,
+      nodes: [...mockDesignerGraphStore.nodes, ...nodesToAdd],
+      edges: [...mockDesignerGraphStore.edges, ...edgesToAdd],
+    };
+
+    if (payload.nodeType === "userTask") {
+      const createdAt = new Date().toISOString();
+      const dueAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+      const createdTask: Task = {
+        id: `t-${newNodeId}`,
+        nodeId: newNodeId,
+        instanceId,
+        definitionName: "Emergency Triage",
+        name: payload.label,
+        assignee: null,
+        role: payload.assignedRole,
+        status: "pending",
+        priority: payload.createdByRole === "reception" ? "high" : "medium",
+        createdAt,
+        dueAt,
+        slaMinutes: 30,
+        minutesRemaining: 30,
+        patientName: payload.patientName?.trim() || "Unknown Patient",
+        patientId: payload.patientId?.trim() || "P-UNSET",
+        formFields: getFormFieldsForUserTask(payload.label, payload.assignedRole),
+        updatedAt: createdAt,
+      };
+
+      mockTasksStore = [createdTask, ...mockTasksStore];
+      upsertSavedTask(createdTask, "open");
+
+      mockAuditStore = [
+        {
+          id: `ae-${Date.now()}`,
+          instanceId: createdTask.instanceId,
+          timestamp: new Date().toISOString(),
+          actor: "System",
+          role: createdTask.role,
+          eventType: "task_created",
+          nodeId: createdTask.nodeId ?? createdTask.id,
+          nodeName: createdTask.name,
+          payload: { source: "task_console" },
+        },
+        ...mockAuditStore,
+      ];
+    }
+
+    if (!mockInstancesStore.some((instance) => instance.id === instanceId)) {
+      mockInstancesStore = [
+        ...mockInstancesStore,
+        {
+          id: instanceId,
+          definitionId: "def1",
+          definitionName: "Emergency Triage",
+          status: "active",
+          startedAt: new Date().toISOString(),
+          startedBy: "System",
+          currentNode: payload.label,
+          priority: "medium",
+          patientId: payload.patientId?.trim() || "P-UNSET",
+          patientName: payload.patientName?.trim() || "Unknown Patient",
+        },
+      ];
+    } else {
+      mockInstancesStore = mockInstancesStore.map((instance) =>
+        instance.id === instanceId ? { ...instance, currentNode: payload.label } : instance
+      );
+    }
+
+    return {
+      tasks: deepClone(mockTasksStore),
+      savedTasks: deepClone(mockSavedTasksStore),
+      graph: deepClone(mockDesignerGraphStore),
+      instances: deepClone(mockInstancesStore),
+      audit: deepClone(mockAuditStore),
+    };
+  },
+
+  async login(email: string, password: string): Promise<AuthPayload> {
+    await sleep();
+    const normalizedEmail = email.trim().toLowerCase();
+    const credential = mockCredentialsStore.find((c) => c.email.toLowerCase() === normalizedEmail);
+    if (!credential || credential.password !== password) {
+      throw new Error("Invalid email or password.");
+    }
+    const user = mockUsersStore.find((u) => u.id === credential.userId && u.active);
+    if (!user) {
+      throw new Error("User not found or inactive.");
+    }
+    return toAuthPayload(user);
+  },
+
+  async register(payload: { name: string; email: string; password: string; role: Role; department: string }): Promise<AuthPayload> {
+    await sleep();
+    const normalizedEmail = payload.email.trim().toLowerCase();
+    const exists = mockUsersStore.some((u) => u.email.toLowerCase() === normalizedEmail);
+    if (exists) {
+      throw new Error("An account with this email already exists.");
+    }
+
+    const newUser: User = {
+      id: `u${mockUsersStore.length + 1}`,
+      name: payload.name.trim(),
+      email: normalizedEmail,
+      role: payload.role,
+      department: payload.department.trim(),
+      active: true,
+    };
+
+    mockUsersStore = [...mockUsersStore, newUser];
+    mockCredentialsStore = [
+      ...mockCredentialsStore,
+      { email: normalizedEmail, password: payload.password, userId: newUser.id },
+    ];
+
+    return toAuthPayload(newUser);
+  },
 };

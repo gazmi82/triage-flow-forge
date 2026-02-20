@@ -1,8 +1,10 @@
-import { MOCK_TASKS, MOCK_INSTANCES, MOCK_DEFINITIONS } from "@/data/mockData";
 import { StatusBadge, PriorityBadge, RoleBadge } from "@/components/ui/Badges";
 import { slaBg } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
+import { useEffect } from "react";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { bootstrapWorkflowThunk } from "@/store/slices/workflowSlice";
 import {
   Activity, ClipboardList, GitBranch, AlertTriangle,
   Clock, Loader2, TrendingUp
@@ -24,13 +26,25 @@ function StatCard({ icon: Icon, label, value, sub, color }: { icon: React.Elemen
 }
 
 export default function Index() {
+  const dispatch = useAppDispatch();
   const navigate = useNavigate();
-  const activeTasks = MOCK_TASKS.filter(t => t.status !== "completed");
-  const overdueTasks = MOCK_TASKS.filter(t => t.minutesRemaining < 0);
-  const activeInstances = MOCK_INSTANCES.filter(i => i.status === "active");
+  const tasks = useAppSelector((state) => state.workflow.tasks);
+  const instances = useAppSelector((state) => state.workflow.instances);
+  const definitions = useAppSelector((state) => state.workflow.definitions);
+  const hasBootstrapped = useAppSelector((state) => state.workflow.hasBootstrapped);
+  const isLoading = useAppSelector((state) => state.workflow.isLoading);
+  const activeTasks = tasks.filter((t) => t.status !== "completed");
+  const overdueTasks = tasks.filter((t) => t.minutesRemaining < 0);
+  const activeInstances = instances.filter((i) => i.status === "active");
   const urgentTasks = [...activeTasks]
     .sort((a, b) => a.minutesRemaining - b.minutesRemaining)
     .slice(0, 5);
+
+  useEffect(() => {
+    if (!hasBootstrapped && !isLoading) {
+      dispatch(bootstrapWorkflowThunk());
+    }
+  }, [dispatch, hasBootstrapped, isLoading]);
 
   return (
     <div className="h-full overflow-y-auto p-6 space-y-6">
@@ -48,10 +62,10 @@ export default function Index() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 2xl:grid-cols-4">
-        <StatCard icon={Activity} label="Active Instances" value={activeInstances.length} sub={`${MOCK_INSTANCES.length} total today`} color="bg-primary/10 text-primary" />
+        <StatCard icon={Activity} label="Active Instances" value={activeInstances.length} sub={`${instances.length} total today`} color="bg-primary/10 text-primary" />
         <StatCard icon={ClipboardList} label="Open Tasks" value={activeTasks.length} sub="Pending in inbox" color="bg-accent/15 text-accent" />
         <StatCard icon={AlertTriangle} label="SLA Breaches" value={overdueTasks.length} sub="Require immediate attention" color="bg-destructive/10 text-destructive" />
-        <StatCard icon={GitBranch} label="Definitions" value={MOCK_DEFINITIONS.filter(d => d.status === "published").length} sub="Published & active" color="bg-node-gateway-and/10 text-node-gateway-and" />
+        <StatCard icon={GitBranch} label="Definitions" value={definitions.filter(d => d.status === "published").length} sub="Published & active" color="bg-node-gateway-and/10 text-node-gateway-and" />
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
@@ -124,7 +138,7 @@ export default function Index() {
           <p className="text-sm font-semibold">Process Health</p>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4">
-          {MOCK_DEFINITIONS.map((def) => (
+          {definitions.map((def) => (
             <div key={def.id} className="p-4">
               <div className="flex items-center justify-between mb-2">
                 <StatusBadge status={def.status} />

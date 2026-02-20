@@ -24,7 +24,7 @@ const ROLE_OPTIONS: Array<{ value: Role; label: string }> = [
 export default function Auth() {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { isAuthenticated, login, register } = useAuth();
+  const { isAuthenticated, isLoading, login, register } = useAuth();
   const [activeTab, setActiveTab] = useState("sign-in");
 
   const [loginEmail, setLoginEmail] = useState("e.chen@hospital.org");
@@ -44,10 +44,10 @@ export default function Auth() {
     return <Navigate to="/" replace />;
   }
 
-  const submitLogin = (e: React.FormEvent) => {
+  const submitLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoginError("");
-    const result = login(loginEmail, loginPassword);
+    const result = await login(loginEmail, loginPassword);
     if (!result.ok) {
       setLoginError(result.error ?? "Unable to sign in.");
       return;
@@ -56,14 +56,14 @@ export default function Auth() {
     navigate("/");
   };
 
-  const submitRegister = (e: React.FormEvent) => {
+  const submitRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setRegisterError("");
     if (registerForm.password.length < 6) {
       setRegisterError("Password must be at least 6 characters.");
       return;
     }
-    const result = register(registerForm);
+    const result = await register(registerForm);
     if (!result.ok) {
       setRegisterError(result.error ?? "Unable to create account.");
       return;
@@ -117,7 +117,7 @@ export default function Auth() {
                       />
                     </div>
                     {loginError && <p className="text-xs text-destructive">{loginError}</p>}
-                    <Button type="submit" className="w-full">Sign In</Button>
+                    <Button type="submit" className="w-full" disabled={isLoading}>Sign In</Button>
                   </form>
                 </TabsContent>
 
@@ -180,7 +180,7 @@ export default function Auth() {
                       />
                     </div>
                     {registerError && <p className="text-xs text-destructive">{registerError}</p>}
-                    <Button type="submit" className="w-full">Create Account</Button>
+                    <Button type="submit" className="w-full" disabled={isLoading}>Create Account</Button>
                   </form>
                 </TabsContent>
               </Tabs>

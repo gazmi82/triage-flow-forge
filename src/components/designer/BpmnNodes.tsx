@@ -40,6 +40,14 @@ export function EndEventNode({ data, selected }: NodeProps) {
 
 // ── User Task ─────────────────────────────────────────────────────────────────
 export function UserTaskNode({ data, selected }: NodeProps) {
+  const taskStatus = String(data.taskStatus || "pending");
+  const statusClass =
+    taskStatus === "completed"
+      ? "bg-success/15 text-success border-success/30"
+      : taskStatus === "claimed"
+        ? "bg-accent/15 text-accent border-accent/30"
+        : "bg-info/15 text-info border-info/30";
+
   return (
     <div className={cn(
       "relative flex min-w-[140px] flex-col rounded-md border-2 border-node-task bg-card shadow-sm transition-shadow",
@@ -54,6 +62,9 @@ export function UserTaskNode({ data, selected }: NodeProps) {
         {data.role && (
           <p className="mt-0.5 text-[10px] text-muted-foreground">{String(data.role)}</p>
         )}
+        <span className={cn("mt-1 inline-flex rounded-full border px-1.5 py-0 text-[9px] font-semibold uppercase", statusClass)}>
+          {taskStatus}
+        </span>
       </div>
       <Handle type="target" position={Position.Left} className="!bg-node-task !border-node-task" />
       <Handle type="source" position={Position.Right} className="!bg-node-task !border-node-task" />

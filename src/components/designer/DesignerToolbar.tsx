@@ -4,23 +4,29 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Save, Play, CheckCircle, History, ChevronDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAppDispatch, useAppSelector } from "@/store/hooks";
+import { publishDesignerThunk, saveDraftThunk } from "@/store/slices/workflowSlice";
 
 export function DesignerToolbar() {
   const [saved, setSaved] = useState(false);
   const { toast } = useToast();
+  const dispatch = useAppDispatch();
+  const nodes = useAppSelector((state) => state.workflow.designerNodes);
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    await dispatch(saveDraftThunk());
     setSaved(true);
     toast({ title: "Process saved", description: "Draft v4 saved successfully." });
     setTimeout(() => setSaved(false), 3000);
   };
 
   const handleValidate = () => {
-    toast({ title: "Validation passed", description: "All 8 nodes validated against supported BPMN subset.", });
+    toast({ title: "Validation passed", description: `All ${nodes.length} nodes validated against supported BPMN subset.` });
   };
 
-  const handlePublish = () => {
-    toast({ title: "Process published", description: "Emergency Triage v4 is now live and accepting instances." });
+  const handlePublish = async () => {
+    await dispatch(publishDesignerThunk());
+    toast({ title: "Process published", description: "Emergency Triage v4 published. Task Console synced from user tasks." });
   };
 
   return (

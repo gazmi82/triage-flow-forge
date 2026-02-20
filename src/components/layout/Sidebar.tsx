@@ -1,8 +1,11 @@
 import { NavLink } from "@/components/NavLink";
 import {
+  type LucideIcon,
   LayoutDashboard,
   GitBranch,
   ClipboardList,
+  FileText,
+  Archive,
   Users,
   Activity,
   ChevronRight,
@@ -12,11 +15,14 @@ import {
 import { ROLE_LABELS, type Role } from "@/data/mockData";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
+import { getAllowedNavRoutes, type AppNavRoute } from "@/lib/permissions";
 
-const NAV_ITEMS = [
+const NAV_ITEMS: Array<{ to: AppNavRoute; icon: LucideIcon; label: string }> = [
   { to: "/", icon: LayoutDashboard, label: "Dashboard" },
   { to: "/designer", icon: GitBranch, label: "Process Designer" },
   { to: "/tasks", icon: ClipboardList, label: "Task Console" },
+  { to: "/draft", icon: FileText, label: "Draft" },
+  { to: "/saved-tasks", icon: Archive, label: "Saved Tasks" },
   { to: "/instances", icon: Activity, label: "Instances" },
   { to: "/admin", icon: Users, label: "Admin" },
 ];
@@ -31,6 +37,8 @@ export function Sidebar() {
       .join("")
       .slice(0, 2)
       .toUpperCase() ?? "NA";
+  const allowedRoutes = getAllowedNavRoutes(currentRole);
+  const visibleItems = NAV_ITEMS.filter((item) => allowedRoutes.includes(item.to));
 
   return (
     <aside className="flex h-screen w-60 flex-col bg-sidebar border-r border-sidebar-border">
@@ -47,7 +55,7 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-0.5">
-        {NAV_ITEMS.map(({ to, icon: Icon, label }) => (
+        {visibleItems.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}
