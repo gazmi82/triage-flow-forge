@@ -28,6 +28,7 @@ export default function Tasks() {
   const { user } = useAuth();
 
   const tasks = useAppSelector((state) => state.workflow.tasks);
+  const savedTasks = useAppSelector((state) => state.workflow.savedTasks);
   const audit = useAppSelector((state) => state.workflow.audit);
   const hasBootstrapped = useAppSelector((state) => state.workflow.hasBootstrapped);
   const isLoading = useAppSelector((state) => state.workflow.isLoading);
@@ -38,10 +39,21 @@ export default function Tasks() {
   const [selectedNodeType, setSelectedNodeType] = useState<TaskNodeType>("userTask");
 
   const currentRole = user?.role ?? "triage_nurse";
-  const visibleTasks = useMemo(
-    () => (currentRole === "admin" ? tasks : tasks.filter((task) => task.role === currentRole)),
-    [currentRole, tasks]
-  );
+  const visibleTasks = useMemo(() => {
+    const isMine = (task: Task) =>
+      currentRole === "admin" || task.role === currentRole || (user?.name ? task.assignee === user.name : false);
+
+    const live = tasks.filter(isMine);
+    const records = savedTasks.filter(isMine);
+
+    const mergedById = new Map<string, Task>();
+    for (const task of records) mergedById.set(task.id, task);
+    for (const task of live) mergedById.set(task.id, task);
+
+    return Array.from(mergedById.values()).sort(
+      (a, b) => new Date(b.updatedAt ?? b.createdAt).getTime() - new Date(a.updatedAt ?? a.createdAt).getTime()
+    );
+  }, [currentRole, savedTasks, tasks, user?.name]);
 
   const filtered = useMemo(
     () =>
