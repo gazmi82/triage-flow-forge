@@ -1,7 +1,17 @@
 import { createAsyncThunk, createSlice, type PayloadAction } from "@reduxjs/toolkit";
-import { addEdge, applyEdgeChanges, applyNodeChanges, type Connection, type EdgeChange, type NodeChange } from "@xyflow/react";
 import {
-  mockApi,
+  addEdge,
+  applyEdgeChanges,
+  applyNodeChanges,
+  type Connection,
+  type Edge,
+  type EdgeChange,
+  type Node,
+  type NodeChange,
+} from "@xyflow/react";
+import { appQueryClient } from "@/data/queryClient";
+import { mockApi } from "@/data/mockApi";
+import {
   type AuditEvent,
   type DraftRecord,
   type DesignerGraphPayload,
@@ -20,8 +30,8 @@ interface WorkflowState {
   tasks: Task[];
   savedTasks: SavedTaskRecord[];
   audit: AuditEvent[];
-  designerNodes: DesignerGraphPayload["nodes"];
-  designerEdges: DesignerGraphPayload["edges"];
+  designerNodes: Node<DesignerGraphPayload["nodes"][number]["data"]>[];
+  designerEdges: Edge[];
   drafts: DraftRecord[];
   activeTaskDesignId: string | null;
   isLoading: boolean;
@@ -46,17 +56,11 @@ const initialState: WorkflowState = {
 };
 
 export const bootstrapWorkflowThunk = createAsyncThunk("workflow/bootstrap", async () => {
-  const [users, definitions, instances, tasks, savedTasks, audit, graph] = await Promise.all([
-    mockApi.fetchUsers(),
-    mockApi.fetchDefinitions(),
-    mockApi.fetchInstances(),
-    mockApi.fetchTasks(),
-    mockApi.fetchSavedTasks(),
-    mockApi.fetchAudit(),
-    mockApi.fetchDesignerGraph(),
-  ]);
-  const drafts = await mockApi.fetchDrafts();
-  return { users, definitions, instances, tasks, savedTasks, audit, graph, drafts };
+  return await appQueryClient.fetchQuery({
+    queryKey: ["mock-data", "workflow-bootstrap"],
+    queryFn: () => mockApi.fetchBootstrapData(),
+    staleTime: 5 * 60 * 1000,
+  });
 });
 
 export const claimTaskThunk = createAsyncThunk("workflow/claimTask", async (payload: { taskId: string; assigneeName: string }) => {
@@ -77,16 +81,16 @@ export const createTaskFromConsoleThunk = createAsyncThunk(
 export const saveDraftThunk = createAsyncThunk("workflow/saveDraft", async (_, { getState }) => {
   const state = getState() as { workflow: WorkflowState };
   return await mockApi.saveDraft({
-    nodes: state.workflow.designerNodes,
-    edges: state.workflow.designerEdges,
+    nodes: state.workflow.designerNodes as DesignerGraphPayload["nodes"],
+    edges: state.workflow.designerEdges as DesignerGraphPayload["edges"],
   });
 });
 
 export const publishDesignerThunk = createAsyncThunk("workflow/publishDesigner", async (_, { getState }) => {
   const state = getState() as { workflow: WorkflowState };
   return await mockApi.publishDesignerGraph({
-    nodes: state.workflow.designerNodes,
-    edges: state.workflow.designerEdges,
+    nodes: state.workflow.designerNodes as DesignerGraphPayload["nodes"],
+    edges: state.workflow.designerEdges as DesignerGraphPayload["edges"],
   });
 });
 

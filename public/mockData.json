@@ -1,0 +1,137 @@
+{
+  "users": [
+    { "id": "u1", "name": "Maria Santos", "email": "m.santos@hospital.org", "role": "reception", "department": "Emergency", "active": true },
+    { "id": "u2", "name": "James Okafor", "email": "j.okafor@hospital.org", "role": "triage_nurse", "department": "Emergency", "active": true },
+    { "id": "u3", "name": "Dr. Emily Chen", "email": "e.chen@hospital.org", "role": "physician", "department": "Emergency", "active": true },
+    { "id": "u4", "name": "Carlos Rivera", "email": "c.rivera@hospital.org", "role": "lab", "department": "Laboratory", "active": true },
+    { "id": "u5", "name": "Priya Nair", "email": "p.nair@hospital.org", "role": "radiology", "department": "Radiology", "active": true },
+    { "id": "u6", "name": "Admin User", "email": "admin@hospital.org", "role": "admin", "department": "IT", "active": true },
+    { "id": "u7", "name": "Sarah Kim", "email": "s.kim@hospital.org", "role": "triage_nurse", "department": "Emergency", "active": true },
+    { "id": "u8", "name": "Dr. Marcus Webb", "email": "m.webb@hospital.org", "role": "physician", "department": "ICU", "active": false },
+    { "id": "u9", "name": "Olivia Ross", "email": "o.ross@hospital.org", "role": "reception", "department": "Emergency", "active": true }
+  ],
+  "authCredentials": [
+    { "email": "m.santos@hospital.org", "password": "demo123", "userId": "u1" },
+    { "email": "j.okafor@hospital.org", "password": "demo123", "userId": "u2" },
+    { "email": "e.chen@hospital.org", "password": "demo123", "userId": "u3" },
+    { "email": "c.rivera@hospital.org", "password": "demo123", "userId": "u4" },
+    { "email": "p.nair@hospital.org", "password": "demo123", "userId": "u5" },
+    { "email": "admin@hospital.org", "password": "admin123", "userId": "u6" },
+    { "email": "s.kim@hospital.org", "password": "demo123", "userId": "u7" },
+    { "email": "o.ross@hospital.org", "password": "demo123", "userId": "u9" }
+  ],
+  "definitions": [
+    {
+      "id": "def1",
+      "key": "emergency_triage",
+      "name": "Emergency Triage",
+      "version": 3,
+      "status": "published",
+      "createdBy": "Admin User",
+      "createdAt": "2024-11-15T09:00:00Z",
+      "updatedAt": "2024-12-02T14:30:00Z",
+      "description": "Standard emergency department triage workflow from patient arrival to physician assessment.",
+      "lanes": ["reception", "triage_nurse", "physician"],
+      "instanceCount": 142
+    },
+    {
+      "id": "def2",
+      "key": "lab_order_processing",
+      "name": "Lab Order Processing",
+      "version": 2,
+      "status": "published",
+      "createdBy": "Dr. Emily Chen",
+      "createdAt": "2024-10-20T11:00:00Z",
+      "updatedAt": "2024-11-28T09:15:00Z",
+      "description": "Laboratory test ordering, sample collection, processing, and result delivery.",
+      "lanes": ["physician", "lab"],
+      "instanceCount": 387
+    },
+    {
+      "id": "def3",
+      "key": "imaging_request",
+      "name": "Imaging Request",
+      "version": 1,
+      "status": "published",
+      "createdBy": "Admin User",
+      "createdAt": "2024-12-01T08:00:00Z",
+      "updatedAt": "2024-12-01T08:00:00Z",
+      "description": "Radiology imaging request from physician order to report delivery.",
+      "lanes": ["physician", "radiology"],
+      "instanceCount": 58
+    },
+    {
+      "id": "def4",
+      "key": "bed_assignment",
+      "name": "Bed Assignment",
+      "version": 1,
+      "status": "draft",
+      "createdBy": "Admin User",
+      "createdAt": "2024-12-10T10:00:00Z",
+      "updatedAt": "2024-12-10T10:00:00Z",
+      "description": "Patient bed assignment and ward transfer workflow.",
+      "lanes": ["reception", "triage_nurse"],
+      "instanceCount": 0
+    }
+  ],
+  "instances": [
+    { "id": "pi-001", "definitionId": "def1", "definitionName": "Emergency Triage", "status": "active", "startedAt": "2024-12-19T08:12:00Z", "startedBy": "Maria Santos", "currentNode": "Physician Assessment", "priority": "critical", "patientId": "P-3821", "patientName": "John Doe" },
+    { "id": "pi-002", "definitionId": "def2", "definitionName": "Lab Order Processing", "status": "active", "startedAt": "2024-12-19T07:45:00Z", "startedBy": "Dr. Emily Chen", "currentNode": "Sample Analysis", "priority": "high", "patientId": "P-3819", "patientName": "Alice Johnson" },
+    { "id": "pi-003", "definitionId": "def1", "definitionName": "Emergency Triage", "status": "active", "startedAt": "2024-12-19T08:55:00Z", "startedBy": "Maria Santos", "currentNode": "Vital Signs Check", "priority": "medium", "patientId": "P-3822", "patientName": "Robert Chen" },
+    { "id": "pi-004", "definitionId": "def3", "definitionName": "Imaging Request", "status": "active", "startedAt": "2024-12-19T06:30:00Z", "startedBy": "Dr. Marcus Webb", "currentNode": "Scan Acquisition", "priority": "high", "patientId": "P-3810", "patientName": "Susan Park" },
+    { "id": "pi-005", "definitionId": "def1", "definitionName": "Emergency Triage", "status": "completed", "startedAt": "2024-12-19T05:00:00Z", "startedBy": "Maria Santos", "currentNode": "End", "priority": "medium", "patientId": "P-3815", "patientName": "David Lee" },
+    { "id": "pi-006", "definitionId": "def2", "definitionName": "Lab Order Processing", "status": "error", "startedAt": "2024-12-19T04:00:00Z", "startedBy": "Dr. Emily Chen", "currentNode": "Result Delivery", "priority": "high", "patientId": "P-3817", "patientName": "Emma Wilson" }
+  ],
+  "tasks": [
+    {
+      "id": "t1",
+      "instanceId": "pi-001",
+      "definitionName": "Emergency Triage",
+      "name": "Physician Assessment",
+      "assignee": null,
+      "role": "physician",
+      "status": "pending",
+      "priority": "critical",
+      "createdAt": "2024-12-19T08:30:00Z",
+      "dueAt": "2024-12-19T09:00:00Z",
+      "slaMinutes": 30,
+      "minutesRemaining": 8,
+      "patientName": "John Doe",
+      "patientId": "P-3821",
+      "formFields": [
+        { "id": "diagnosis", "label": "Primary Diagnosis", "type": "text", "required": true },
+        { "id": "severity", "label": "Severity Level", "type": "select", "required": true, "options": ["1 - Critical", "2 - Emergent", "3 - Urgent", "4 - Less Urgent", "5 - Non-Urgent"] },
+        { "id": "notes", "label": "Clinical Notes", "type": "textarea", "required": false },
+        { "id": "admit", "label": "Admit to Hospital", "type": "boolean", "required": true }
+      ]
+    },
+    {
+      "id": "t2",
+      "instanceId": "pi-003",
+      "definitionName": "Emergency Triage",
+      "name": "Vital Signs Check",
+      "assignee": "James Okafor",
+      "role": "triage_nurse",
+      "status": "claimed",
+      "priority": "medium",
+      "createdAt": "2024-12-19T09:00:00Z",
+      "dueAt": "2024-12-19T09:30:00Z",
+      "slaMinutes": 30,
+      "minutesRemaining": 22,
+      "patientName": "Robert Chen",
+      "patientId": "P-3822",
+      "formFields": [
+        { "id": "bp_sys", "label": "Blood Pressure (Systolic)", "type": "number", "required": true },
+        { "id": "bp_dia", "label": "Blood Pressure (Diastolic)", "type": "number", "required": true },
+        { "id": "heart_rate", "label": "Heart Rate (bpm)", "type": "number", "required": true },
+        { "id": "temp", "label": "Temperature (°C)", "type": "number", "required": true },
+        { "id": "spo2", "label": "SpO2 (%)", "type": "number", "required": true }
+      ]
+    }
+  ],
+  "audit": [
+    { "id": "ae1", "instanceId": "pi-001", "timestamp": "2024-12-19T08:12:00Z", "actor": "Maria Santos", "role": "reception", "eventType": "instance_started", "nodeId": "start1", "nodeName": "Patient Arrival", "payload": { "patientId": "P-3821" } },
+    { "id": "ae2", "instanceId": "pi-001", "timestamp": "2024-12-19T08:13:00Z", "actor": "System", "role": "reception", "eventType": "task_created", "nodeId": "task1", "nodeName": "Registration" },
+    { "id": "ae3", "instanceId": "pi-001", "timestamp": "2024-12-19T08:14:00Z", "actor": "Maria Santos", "role": "reception", "eventType": "task_claimed", "nodeId": "task1", "nodeName": "Registration" }
+  ]
+}

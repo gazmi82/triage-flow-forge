@@ -2,15 +2,16 @@ import { lazy, Suspense, useEffect } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Sidebar, TopNavbar } from "@/components/layout";
 import { useAuth } from "@/hooks";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { bootstrapWorkflowThunk } from "@/store/slices";
 import { getDefaultRouteForRole, isAdminRole } from "@/lib";
+import { appQueryClient } from "@/data/queryClient";
 
-const Index = lazy(() => import("./pages/Index"));
+const Index = lazy(() => import("./pages/Index.tsx"));
 const Designer = lazy(() => import("./pages/Designer"));
 const Tasks = lazy(() => import("./pages/Tasks"));
 const Draft = lazy(() => import("./pages/Draft"));
@@ -19,8 +20,6 @@ const Instances = lazy(() => import("./pages/Instances"));
 const Admin = lazy(() => import("./pages/Admin"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Auth = lazy(() => import("./pages/Auth"));
-
-const queryClient = new QueryClient();
 
 function ProtectedApp() {
   const dispatch = useAppDispatch();
@@ -80,7 +79,7 @@ function ProtectedApp() {
 }
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
+  <QueryClientProvider client={appQueryClient}>
     <TooltipProvider>
       <Toaster />
       <Sonner />

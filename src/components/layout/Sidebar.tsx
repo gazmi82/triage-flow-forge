@@ -12,7 +12,8 @@ import {
   Hospital,
   LogOut,
 } from "lucide-react";
-import { ROLE_LABELS, type Role } from "@/data/mockData";
+import type { Role } from "@/data/mockData";
+import { ROLE_LABELS } from "@/data/constants";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 import { getAllowedNavRoutes, type AppNavRoute } from "@/lib/permissions";

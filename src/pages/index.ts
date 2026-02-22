@@ -1,9 +1,0 @@
-export { default as AdminPage } from './Admin';
-export { default as AuthPage } from './Auth';
-export { default as DesignerPage } from './Designer';
-export { default as DraftPage } from './Draft';
-export { default as IndexPage } from './Index.tsx';
-export { default as InstancesPage } from './Instances';
-export { default as NotFoundPage } from './NotFound';
-export { default as SavedTasksPage } from './SavedTasks';
-export { default as TasksPage } from './Tasks';

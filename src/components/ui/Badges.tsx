@@ -1,6 +1,6 @@
 import { cn } from "@/lib/utils";
 import type { Role } from "@/data/mockData";
-import { ROLE_LABELS, ROLE_COLORS } from "@/data/mockData";
+import { ROLE_LABELS, ROLE_COLORS } from "@/data/constants";
 
 interface RoleBadgeProps {
   role: Role;
