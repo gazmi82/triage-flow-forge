@@ -81,11 +81,24 @@ export default function Tasks() {
     }
   }, [filtered, selectedTaskId]);
 
-  const completeTask = async (redirectRole: Role) => {
+  const completeTask = async (payload: {
+    redirectRole: Role;
+    patientName?: string;
+    patientId?: string;
+    conditionExpression?: string;
+    correlationKey?: string;
+  }) => {
     if (!selectedTask) return;
 
     const completedTask = selectedTask;
-    await dispatch(completeTaskThunk({ taskId: completedTask.id, actor: user?.name ?? "System" }));
+    await dispatch(
+      completeTaskThunk({
+        taskId: completedTask.id,
+        actor: user?.name ?? "System",
+        patientName: payload.patientName,
+        patientId: payload.patientId,
+      })
+    );
     setSelectedTaskId(null);
 
     const createNodeResult = await dispatch(
@@ -94,10 +107,12 @@ export default function Tasks() {
         instanceId: completedTask.instanceId,
         nodeType: selectedNodeType,
         label: getDefaultNodeLabel(selectedNodeType, completedTask.name),
-        assignedRole: redirectRole,
+        conditionExpression: payload.conditionExpression,
+        correlationKey: payload.correlationKey,
+        assignedRole: payload.redirectRole,
         createdByRole: user?.role ?? "triage_nurse",
-        patientName: completedTask.patientName,
-        patientId: completedTask.patientId,
+        patientName: payload.patientName ?? completedTask.patientName,
+        patientId: payload.patientId ?? completedTask.patientId,
         registrationNote: `Auto-generated after completing ${completedTask.name}`,
       })
     );
@@ -105,23 +120,22 @@ export default function Tasks() {
     if (!createTaskFromConsoleThunk.fulfilled.match(createNodeResult)) return;
 
     if (selectedNodeType !== "userTask" && selectedNodeType !== "endEvent") {
-      const createdNode = createNodeResult.payload.graph.nodes[createNodeResult.payload.graph.nodes.length - 1];
       await dispatch(
         createTaskFromConsoleThunk({
-          fromNodeId: createdNode?.id ?? completedTask.nodeId ?? null,
+          fromNodeId: createNodeResult.payload.createdNodeId,
           instanceId: completedTask.instanceId,
           nodeType: "userTask",
-          label: `${ROLE_LABELS[redirectRole]} Task`,
-          assignedRole: redirectRole,
+          label: `${ROLE_LABELS[payload.redirectRole]} Task`,
+          assignedRole: payload.redirectRole,
           createdByRole: user?.role ?? "triage_nurse",
-          patientName: completedTask.patientName,
-          patientId: completedTask.patientId,
+          patientName: payload.patientName ?? completedTask.patientName,
+          patientId: payload.patientId ?? completedTask.patientId,
           registrationNote: `Auto-generated after ${selectedNodeType}`,
         })
       );
     }
 
-    toast({ title: "Task progressed", description: `Redirected to ${ROLE_LABELS[redirectRole]}.` });
+    toast({ title: "Task progressed", description: `Redirected to ${ROLE_LABELS[payload.redirectRole]}.` });
     setShowTimeline(false);
   };
 
@@ -134,19 +148,25 @@ export default function Tasks() {
   };
 
   const createTask = async () => {
-    await dispatch(
+    const created = await dispatch(
       createTaskFromConsoleThunk({
-        fromNodeId: selectedTask?.nodeId ?? null,
-        instanceId: selectedTask?.instanceId ?? null,
-        nodeType: selectedNodeType,
-        label: getDefaultNodeLabel(selectedNodeType, selectedTask?.name),
+        fromNodeId: null,
+        instanceId: null,
+        nodeType: "userTask",
+        label: getDefaultNodeLabel("userTask"),
         assignedRole: currentRole,
         createdByRole: user?.role ?? "triage_nurse",
-        patientName: selectedTask?.patientName ?? "Generated from Task Console",
-        patientId: selectedTask?.patientId ?? "P-NEW",
+        patientName: "Generated from Task Console",
+        patientId: `P-${Date.now()}`,
         registrationNote: "Created from shape/type accordion",
       })
     );
+
+    if (!createTaskFromConsoleThunk.fulfilled.match(created)) return;
+    const createdTask = created.payload.tasks.find((task) => task.nodeId === created.payload.createdNodeId);
+    if (createdTask) {
+      setSelectedTaskId(createdTask.id);
+    }
   };
 
   const openTaskProcessDesign = async (taskId: string) => {
@@ -217,7 +237,12 @@ export default function Tasks() {
             <div className="flex-1 overflow-y-auto p-6">
               <p className="mb-4 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Task Form</p>
               <div className="max-w-lg">
-                <TaskForm task={selectedTask} onComplete={completeTask} onSaveDraft={saveDraft} />
+                <TaskForm
+                  task={selectedTask}
+                  selectedNodeType={selectedNodeType}
+                  onComplete={completeTask}
+                  onSaveDraft={saveDraft}
+                />
               </div>
             </div>
 

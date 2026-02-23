@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ChevronsUpDown, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks";
 import { ROLE_LABELS } from "@/data/constants";
 import type { Role, Task } from "@/data/mockData";
+import type { TaskNodeType } from "@/pages/tasks/types";
 import {
   Button,
   Checkbox,
@@ -18,23 +19,40 @@ import {
 
 interface TaskFormProps {
   task: Task;
-  onComplete: (redirectRole: Role) => void;
+  selectedNodeType: TaskNodeType;
+  onComplete: (payload: {
+    redirectRole: Role;
+    patientName?: string;
+    patientId?: string;
+    conditionExpression?: string;
+    correlationKey?: string;
+  }) => Promise<void> | void;
   onSaveDraft: () => void;
 }
 
-export function TaskForm({ task, onComplete, onSaveDraft }: TaskFormProps) {
+export function TaskForm({ task, selectedNodeType, onComplete, onSaveDraft }: TaskFormProps) {
   const { toast } = useToast();
   const [values, setValues] = useState<Record<string, string | boolean>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [redirectRole, setRedirectRole] = useState<Role | "">("");
   const [showRedirectAccordion, setShowRedirectAccordion] = useState(true);
+  const [conditionA, setConditionA] = useState("");
+  const [conditionB, setConditionB] = useState("");
+  const [correlationKey, setCorrelationKey] = useState("");
 
-  useEffect(() => {
+  const resetForm = useCallback(() => {
     setValues({});
     setErrors({});
     setRedirectRole("");
     setShowRedirectAccordion(true);
-  }, [task.id]);
+    setConditionA("");
+    setConditionB("");
+    setCorrelationKey("");
+  }, []);
+
+  useEffect(() => {
+    resetForm();
+  }, [resetForm, task.id, task.status, task.updatedAt]);
 
   const setFieldValue = (fieldId: string, value: string | boolean) => {
     setValues((prev) => ({ ...prev, [fieldId]: value }));
@@ -62,7 +80,21 @@ export function TaskForm({ task, onComplete, onSaveDraft }: TaskFormProps) {
     return Object.keys(nextErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const findStringFieldValue = (candidates: string[], labelHints: string[]) => {
+    for (const candidate of candidates) {
+      const value = values[candidate];
+      if (typeof value === "string" && value.trim().length > 0) return value.trim();
+    }
+    for (const field of task.formFields) {
+      const fieldLabel = field.label.toLowerCase();
+      if (!labelHints.some((hint) => fieldLabel.includes(hint))) continue;
+      const value = values[field.id];
+      if (typeof value === "string" && value.trim().length > 0) return value.trim();
+    }
+    return undefined;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) {
       toast({
@@ -81,7 +113,17 @@ export function TaskForm({ task, onComplete, onSaveDraft }: TaskFormProps) {
       return;
     }
     toast({ title: "Task completed", description: `"${task.name}" has been completed and the process advanced.` });
-    onComplete(redirectRole);
+    await onComplete({
+      redirectRole,
+      patientName: findStringFieldValue(["patient_name", "patientName"], ["patient name"]),
+      patientId: findStringFieldValue(["patient_id", "patientId"], ["patient id"]),
+      conditionExpression:
+        selectedNodeType === "xorGateway"
+          ? [conditionA.trim(), conditionB.trim()].filter(Boolean).join(" | ")
+          : undefined,
+      correlationKey: selectedNodeType === "messageEvent" ? correlationKey.trim() || undefined : undefined,
+    });
+    resetForm();
   };
 
   return (
@@ -156,6 +198,64 @@ export function TaskForm({ task, onComplete, onSaveDraft }: TaskFormProps) {
           {errors[field.id] && <p className="text-[11px] text-destructive">{errors[field.id]}</p>}
         </div>
       ))}
+
+      {selectedNodeType !== "userTask" && (
+        <div className="space-y-2 rounded-md border border-border bg-card p-2.5">
+          <p className="text-xs font-semibold">
+            {selectedNodeType === "xorGateway" || selectedNodeType === "andGateway"
+              ? "Gateway Configuration"
+              : "Event Configuration"}
+          </p>
+
+          {selectedNodeType === "xorGateway" && (
+            <>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Condition A</Label>
+                <Input
+                  className="h-8 text-sm"
+                  placeholder="critical"
+                  value={conditionA}
+                  onChange={(e) => setConditionA(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Condition B</Label>
+                <Input
+                  className="h-8 text-sm"
+                  placeholder="non_critical"
+                  value={conditionB}
+                  onChange={(e) => setConditionB(e.target.value)}
+                />
+              </div>
+            </>
+          )}
+
+          {selectedNodeType === "messageEvent" && (
+            <div className="space-y-1.5">
+              <Label className="text-xs">Correlation Key</Label>
+              <Input
+                className="h-8 text-sm"
+                placeholder="patient_id or order_id"
+                value={correlationKey}
+                onChange={(e) => setCorrelationKey(e.target.value)}
+              />
+            </div>
+          )}
+
+          {selectedNodeType === "timerEvent" && (
+            <p className="text-xs text-muted-foreground">Timer event will be inserted before next routed task.</p>
+          )}
+          {selectedNodeType === "signalEvent" && (
+            <p className="text-xs text-muted-foreground">Signal event will be inserted before next routed task.</p>
+          )}
+          {selectedNodeType === "andGateway" && (
+            <p className="text-xs text-muted-foreground">AND gateway will branch in parallel to downstream tasks.</p>
+          )}
+          {selectedNodeType === "endEvent" && (
+            <p className="text-xs text-muted-foreground">End event will close this path after current task completion.</p>
+          )}
+        </div>
+      )}
 
       <div className="space-y-2 rounded-md border border-border bg-card p-2.5">
         <button

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.2.0",
+  "schemaVersion": "1.3.0",
   "definition": {
     "id": "def.emergency_triage.v5",
     "key": "emergency_triage",
@@ -105,6 +105,81 @@
       "saved_tasks_registry": "saved tasks keeps all task records with process status and supports process redirection"
     }
   },
+  "bpmnSubsetProfile": {
+    "name": "triage-bpmn-subset-v1",
+    "baseSpec": "OMG BPMN 2.0.2",
+    "conformance": "descriptive_subset",
+    "supportedElements": {
+      "events": [
+        "startEvent",
+        "endEvent",
+        "timerEvent",
+        "messageEvent",
+        "signalEvent"
+      ],
+      "activities": [
+        "userTask"
+      ],
+      "gateways": [
+        "xorGateway",
+        "andGateway"
+      ],
+      "flowConnectors": [
+        "sequenceFlow"
+      ],
+      "lanes": [
+        "reception",
+        "triage_nurse",
+        "physician",
+        "lab",
+        "radiology"
+      ]
+    },
+    "executionSemantics": {
+      "sourceOfTruth": "task_console",
+      "designerProjection": "read_only",
+      "startRule": "first_non_start_node_autocreates_startEvent",
+      "endRule": "endEvent_closes_instance_when_no_open_tasks",
+      "gatewayRules": {
+        "xorGateway": "single_outgoing_sequence_chosen_by_condition_or_operator",
+        "andGateway": "all_outgoing_sequences_open_parallel_work"
+      },
+      "eventRules": {
+        "timerEvent": "creates_or_updates_sla_wait_state",
+        "messageEvent": "waits_for_external_payload_with_optional_correlation_key",
+        "signalEvent": "broadcast_style_transition_across_matching_instances_optional"
+      }
+    },
+    "validationRules": {
+      "requiredPerProcess": [
+        "at_least_one_startEvent",
+        "at_least_one_endEvent"
+      ],
+      "nodeConstraints": {
+        "startEvent": {
+          "incomingSequenceMax": 0
+        },
+        "endEvent": {
+          "outgoingSequenceMax": 0
+        },
+        "userTask": {
+          "requiresAssignedRole": true,
+          "requiresLabel": true
+        }
+      },
+      "edgeConstraints": {
+        "allowedEdgeTypes": [
+          "sequenceFlow"
+        ],
+        "disallowSelfLoop": true
+      }
+    },
+    "serialization": {
+      "primary": "workflow.definition.json",
+      "runtimeGraph": "redux_workflow_state",
+      "bpmnXmlImportExport": "planned_not_implemented"
+    }
+  },
   "graph": {
     "initialState": {
       "nodes": [],
@@ -119,6 +194,9 @@
       "timerEvent",
       "messageEvent",
       "signalEvent"
+    ],
+    "supportedEdgeTypes": [
+      "sequenceFlow"
     ]
   }
 }

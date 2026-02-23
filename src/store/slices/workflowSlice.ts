@@ -13,7 +13,11 @@ import { appQueryClient } from "@/data/queryClient";
 import { mockApi } from "@/data/mockApi";
 import {
   type AuditEvent,
+  type BpmnNodeType,
   type DraftRecord,
+  type DesignerGraphEdge,
+  type DesignerGraphNode,
+  type DesignerGraphNodeData,
   type DesignerGraphPayload,
   type CreateTaskFromConsolePayload,
   type ProcessDefinition,
@@ -30,7 +34,7 @@ interface WorkflowState {
   tasks: Task[];
   savedTasks: SavedTaskRecord[];
   audit: AuditEvent[];
-  designerNodes: Node<DesignerGraphPayload["nodes"][number]["data"]>[];
+  designerNodes: Node<DesignerGraphNodeData>[];
   designerEdges: Edge[];
   drafts: DraftRecord[];
   activeTaskDesignId: string | null;
@@ -41,8 +45,8 @@ interface WorkflowState {
 
 const toDesignerNodes = (
   nodes: DesignerGraphPayload["nodes"]
-): Node<DesignerGraphPayload["nodes"][number]["data"]>[] =>
-  nodes as Node<DesignerGraphPayload["nodes"][number]["data"]>[];
+): Node<DesignerGraphNodeData>[] =>
+  nodes as Node<DesignerGraphNodeData>[];
 
 const toDesignerEdges = (edges: DesignerGraphPayload["edges"]): Edge[] => edges as Edge[];
 
@@ -89,10 +93,13 @@ export const claimTaskThunk = createAsyncThunk<ClaimTaskPayload, { taskId: strin
   }
 );
 
-export const completeTaskThunk = createAsyncThunk<CompleteTaskPayload, { taskId: string; actor: string }>(
+export const completeTaskThunk = createAsyncThunk<
+  CompleteTaskPayload,
+  { taskId: string; actor: string; patientName?: string; patientId?: string }
+>(
   "workflow/completeTask",
   async (payload) => {
-    return await mockApi.completeTask(payload.taskId, payload.actor);
+    return await mockApi.completeTask(payload.taskId, payload.actor, payload.patientName, payload.patientId);
   }
 );
 
@@ -108,8 +115,8 @@ export const saveDraftThunk = createAsyncThunk<SaveDraftPayload, void, { state: 
   async (_, { getState }) => {
     const state = getState();
     return await mockApi.saveDraft({
-      nodes: state.workflow.designerNodes as DesignerGraphPayload["nodes"],
-      edges: state.workflow.designerEdges as DesignerGraphPayload["edges"],
+      nodes: state.workflow.designerNodes as unknown as DesignerGraphNode[],
+      edges: state.workflow.designerEdges as unknown as DesignerGraphEdge[],
     });
   }
 );
@@ -121,8 +128,8 @@ export const publishDesignerThunk = createAsyncThunk<
 >("workflow/publishDesigner", async (_, { getState }) => {
   const state = getState();
   return await mockApi.publishDesignerGraph({
-    nodes: state.workflow.designerNodes as DesignerGraphPayload["nodes"],
-    edges: state.workflow.designerEdges as DesignerGraphPayload["edges"],
+    nodes: state.workflow.designerNodes as unknown as DesignerGraphNode[],
+    edges: state.workflow.designerEdges as unknown as DesignerGraphEdge[],
   });
 });
 
@@ -163,6 +170,7 @@ const workflowSlice = createSlice({
       state.designerEdges = addEdge(
         {
           ...action.payload,
+          type: "sequenceFlow",
           markerEnd: { type: "arrowclosed" },
           style: { stroke: "hsl(220,68%,30%)" },
         },
@@ -171,7 +179,7 @@ const workflowSlice = createSlice({
     },
     addDesignerNode(
       state,
-      action: PayloadAction<{ type: string; label: string; position: { x: number; y: number } }>
+      action: PayloadAction<{ type: BpmnNodeType; label: string; position: { x: number; y: number } }>
     ) {
       state.designerNodes.push({
         id: `node_${Date.now()}`,
@@ -190,7 +198,7 @@ const workflowSlice = createSlice({
         node.id === action.payload.id ? { ...node, data: { ...node.data, role: action.payload.role } } : node
       );
     },
-    updateDesignerNodeType(state, action: PayloadAction<{ id: string; type: string }>) {
+    updateDesignerNodeType(state, action: PayloadAction<{ id: string; type: BpmnNodeType }>) {
       state.designerNodes = state.designerNodes.map((node) =>
         node.id === action.payload.id ? { ...node, type: action.payload.type } : node
       );
@@ -248,22 +256,38 @@ const workflowSlice = createSlice({
         state.designerNodes = toDesignerNodes(action.payload.graph.nodes);
         state.designerEdges = toDesignerEdges(action.payload.graph.edges);
         state.drafts = action.payload.drafts;
+        state.error = null;
+      })
+      .addCase(saveDraftThunk.rejected, (state, action) => {
+        state.error = action.error.message ?? "Unable to save draft.";
       })
       .addCase(publishDesignerThunk.fulfilled, (state, action) => {
         state.designerNodes = toDesignerNodes(action.payload.graph.nodes);
         state.designerEdges = toDesignerEdges(action.payload.graph.edges);
         state.tasks = action.payload.tasks;
         state.instances = action.payload.instances;
+        state.error = null;
+      })
+      .addCase(publishDesignerThunk.rejected, (state, action) => {
+        state.error = action.error.message ?? "Unable to publish process.";
       })
       .addCase(loadDraftThunk.fulfilled, (state, action) => {
         state.designerNodes = toDesignerNodes(action.payload.draft.graph.nodes);
         state.designerEdges = toDesignerEdges(action.payload.draft.graph.edges);
         state.activeTaskDesignId = null;
+        state.error = null;
+      })
+      .addCase(loadDraftThunk.rejected, (state, action) => {
+        state.error = action.error.message ?? "Unable to load draft.";
       })
       .addCase(openTaskDesignerThunk.fulfilled, (state, action) => {
         state.designerNodes = toDesignerNodes(action.payload.graph.nodes);
         state.designerEdges = toDesignerEdges(action.payload.graph.edges);
         state.activeTaskDesignId = action.payload.taskId;
+        state.error = null;
+      })
+      .addCase(openTaskDesignerThunk.rejected, (state, action) => {
+        state.error = action.error.message ?? "Unable to open designer for task.";
       });
   },
 });

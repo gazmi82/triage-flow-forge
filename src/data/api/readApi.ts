@@ -9,7 +9,12 @@ import type {
   User,
   WorkflowBootstrapPayload,
 } from "@/data/mockData";
-import { INITIAL_DESIGNER_GRAPH, buildInstanceDesignerGraph, deepClone } from "@/data/workflowLogic";
+import {
+  INITIAL_DESIGNER_GRAPH,
+  buildInstanceDesignerGraph,
+  deepClone,
+  projectDesignerGraphByInstance,
+} from "@/data/workflowLogic";
 import { ensureInitialized, mockStore, sleep } from "@/data/api/state";
 
 export const readApi = {
@@ -76,6 +81,10 @@ export const readApi = {
     const task = mockStore.savedTasks.find((item) => item.id === taskId) ?? mockStore.tasks.find((item) => item.id === taskId);
     if (!task) {
       return deepClone(INITIAL_DESIGNER_GRAPH);
+    }
+    const projected = projectDesignerGraphByInstance(mockStore.designerGraph, task.instanceId);
+    if (projected.nodes.length > 0) {
+      return projected;
     }
     const instanceTasks = mockStore.savedTasks.filter((item) => item.instanceId === task.instanceId);
     return buildInstanceDesignerGraph(instanceTasks);

@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PriorityBadge, RoleBadge, StatusBadge } from "@/components/ui/Badges";
 import { formatTime } from "@/lib/formatters";
+import { useAuth } from "@/hooks";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { bootstrapWorkflowThunk, loadDraftThunk, openTaskDesignerThunk } from "@/store/slices/workflowSlice";
 import { FileText, Grid3X3, List, Search } from "lucide-react";
@@ -16,10 +17,13 @@ type SortField = "createdAt" | "updatedAt";
 type SortDirection = "asc" | "desc";
 type ViewMode = "table" | "cards";
 type ProcessStatus = "all" | "open" | "closed";
+const isGenericTaskName = (name: string) => /^user task/i.test(name.trim());
+const isGeneratedPatientName = (name: string) => /^generated from task console$/i.test(name.trim());
 
 export default function SavedTasks() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const savedTasks = useAppSelector((state) => state.workflow.savedTasks);
   const drafts = useAppSelector((state) => state.workflow.drafts);
   const hasBootstrapped = useAppSelector((state) => state.workflow.hasBootstrapped);
@@ -36,8 +40,14 @@ export default function SavedTasks() {
     }
   }, [dispatch, hasBootstrapped, isLoading]);
 
+  const visibleSavedTasks = useMemo(() => {
+    if (!user) return [];
+    if (user.role === "admin") return savedTasks;
+    return savedTasks.filter((task) => task.role === user.role || task.assignee === user.name);
+  }, [savedTasks, user]);
+
   const filtered = useMemo(() => {
-    return [...savedTasks]
+    return [...visibleSavedTasks]
       .filter((task) => {
         if (status !== "all" && task.processStatus !== status) return false;
         const q = query.trim().toLowerCase();
@@ -54,7 +64,7 @@ export default function SavedTasks() {
         const bValue = new Date(b[sortField] ?? b.createdAt).getTime();
         return sortDirection === "asc" ? aValue - bValue : bValue - aValue;
       });
-  }, [query, savedTasks, sortDirection, sortField, status]);
+  }, [query, sortDirection, sortField, status, visibleSavedTasks]);
 
   const orderedDrafts = useMemo(() => [...drafts].sort((a, b) => b.savedAt.localeCompare(a.savedAt)), [drafts]);
 
@@ -68,8 +78,20 @@ export default function SavedTasks() {
     navigate("/designer");
   };
 
-  const openCount = savedTasks.filter((task) => task.processStatus === "open").length;
-  const closedCount = savedTasks.filter((task) => task.processStatus === "closed").length;
+  const getTaskTitle = (task: (typeof filtered)[number]) => {
+    if (isGenericTaskName(task.name) && !isGeneratedPatientName(task.patientName)) {
+      return task.patientName;
+    }
+    return task.name;
+  };
+
+  const getPatientDisplayName = (task: (typeof filtered)[number]) => {
+    if (!isGeneratedPatientName(task.patientName)) return task.patientName;
+    return "Patient Name Pending";
+  };
+
+  const openCount = visibleSavedTasks.filter((task) => task.processStatus === "open").length;
+  const closedCount = visibleSavedTasks.filter((task) => task.processStatus === "closed").length;
 
   return (
     <div className="h-full overflow-y-auto p-6">
@@ -86,7 +108,7 @@ export default function SavedTasks() {
 
         <TabsContent value="saved_tasks" className="space-y-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <Card><CardContent className="p-4"><p className="text-[11px] text-muted-foreground">Total</p><p className="text-2xl font-bold">{savedTasks.length}</p></CardContent></Card>
+            <Card><CardContent className="p-4"><p className="text-[11px] text-muted-foreground">Total</p><p className="text-2xl font-bold">{visibleSavedTasks.length}</p></CardContent></Card>
             <Card><CardContent className="p-4"><p className="text-[11px] text-muted-foreground">Open</p><p className="text-2xl font-bold text-info">{openCount}</p></CardContent></Card>
             <Card><CardContent className="p-4"><p className="text-[11px] text-muted-foreground">Closed</p><p className="text-2xl font-bold text-success">{closedCount}</p></CardContent></Card>
           </div>
@@ -143,11 +165,11 @@ export default function SavedTasks() {
                   {filtered.map((task) => (
                     <tr key={task.id} className="hover:bg-muted/20">
                       <td className="px-3 py-2">
-                        <p className="font-semibold">{task.name}</p>
+                        <p className="font-semibold">{getTaskTitle(task)}</p>
                         <p className="text-[10px] text-muted-foreground">{task.definitionName}</p>
                       </td>
                       <td className="px-3 py-2">
-                        <p>{task.patientName}</p>
+                        <p>{getPatientDisplayName(task)}</p>
                         <p className="text-[10px] text-muted-foreground">{task.patientId}</p>
                       </td>
                       <td className="px-3 py-2"><RoleBadge role={task.role} /></td>
@@ -172,12 +194,12 @@ export default function SavedTasks() {
               {filtered.map((task) => (
                 <Card key={task.id}>
                   <CardHeader className="pb-2">
-                    <CardTitle className="text-sm">{task.name}</CardTitle>
+                    <CardTitle className="text-sm">{getTaskTitle(task)}</CardTitle>
                     <CardDescription className="text-xs">{task.definitionName}</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-2 text-xs">
                     <div className="flex gap-1.5"><StatusBadge status={task.status} /><PriorityBadge priority={task.priority} /><RoleBadge role={task.role} /></div>
-                    <p>{task.patientName} · {task.patientId}</p>
+                    <p>{getPatientDisplayName(task)} · {task.patientId}</p>
                     <p className="text-muted-foreground">created_at: {formatTime(task.createdAt)}</p>
                     <p className="text-muted-foreground">updated_at: {formatTime(task.updatedAt ?? task.createdAt)}</p>
                     <Badge variant={task.processStatus === "open" ? "secondary" : "outline"}>{task.processStatus}</Badge>

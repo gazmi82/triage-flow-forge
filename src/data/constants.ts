@@ -1,4 +1,4 @@
-import type { Role } from "@/data/mockData";
+import type { BpmnEdgeType, BpmnNodeType, Role } from "@/data/mockData";
 
 export const ROLE_LABELS: Record<Role, string> = {
   reception: "Reception",
@@ -17,3 +17,16 @@ export const ROLE_COLORS: Record<Role, string> = {
   radiology: "bg-node-gateway-and/10 text-node-gateway-and border-node-gateway-and/20",
   admin: "bg-muted text-muted-foreground border-border",
 };
+
+export const BPMN_SUPPORTED_NODE_TYPES: readonly BpmnNodeType[] = [
+  "startEvent",
+  "endEvent",
+  "userTask",
+  "xorGateway",
+  "andGateway",
+  "timerEvent",
+  "messageEvent",
+  "signalEvent",
+] as const;
+
+export const BPMN_SUPPORTED_EDGE_TYPES: readonly BpmnEdgeType[] = ["sequenceFlow"] as const;

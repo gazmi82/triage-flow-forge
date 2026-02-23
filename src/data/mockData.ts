@@ -1,4 +1,18 @@
 export type Role = "reception" | "triage_nurse" | "physician" | "lab" | "radiology" | "admin";
+export type TaskStatus = "pending" | "claimed" | "completed" | "overdue";
+export type DesignerTaskStatus = "pending" | "claimed" | "completed";
+export type BpmnNodeType =
+  | "startEvent"
+  | "endEvent"
+  | "userTask"
+  | "xorGateway"
+  | "andGateway"
+  | "timerEvent"
+  | "messageEvent"
+  | "signalEvent";
+export type BpmnEdgeType = "sequenceFlow" | "messageFlow" | "association";
+export type EventDefinitionType = "none" | "timer" | "message" | "signal";
+export type GatewayDirection = "unspecified" | "converging" | "diverging" | "mixed";
 
 export interface User {
   id: string;
@@ -58,7 +72,7 @@ export interface Task {
   name: string;
   assignee: string | null;
   role: Role;
-  status: "pending" | "claimed" | "completed" | "overdue";
+  status: TaskStatus;
   priority: "low" | "medium" | "high" | "critical";
   createdAt: string;
   dueAt: string;
@@ -95,23 +109,44 @@ export interface AuthPayload {
 }
 
 export interface DesignerGraphPayload {
-  nodes: Array<{
-    id: string;
-    type: string;
-    position: { x: number; y: number };
-    width?: number;
-    height?: number;
-    style?: Record<string, string | number>;
-    data: { label?: string; role?: string; taskStatus?: "pending" | "claimed" | "completed" };
-  }>;
-  edges: Array<{
-    id: string;
-    source: string;
-    target: string;
-    label?: string;
-    markerEnd?: { type: string };
-    style?: Record<string, string | number>;
-  }>;
+  nodes: DesignerGraphNode[];
+  edges: DesignerGraphEdge[];
+}
+
+export interface DesignerGraphNodeData extends Record<string, unknown> {
+  label?: string;
+  role?: string;
+  instanceId?: string;
+  taskStatus?: DesignerTaskStatus;
+  eventDefinitionType?: EventDefinitionType;
+  gatewayDirection?: GatewayDirection;
+  laneRef?: Exclude<Role, "admin">;
+  conditionExpression?: string;
+  correlationKey?: string;
+}
+
+export interface DesignerGraphNode {
+  id: string;
+  type: BpmnNodeType;
+  position: { x: number; y: number };
+  width?: number;
+  height?: number;
+  style?: Record<string, string | number>;
+  data: DesignerGraphNodeData;
+}
+
+export interface DesignerGraphEdge {
+  id: string;
+  source: string;
+  target: string;
+  type?: BpmnEdgeType;
+  label?: string;
+  labelStyle?: Record<string, string | number>;
+  labelBgStyle?: Record<string, string | number>;
+  labelBgPadding?: [number, number];
+  labelBgBorderRadius?: number;
+  markerEnd?: { type: string };
+  style?: Record<string, string | number>;
 }
 
 export interface DraftRecord {
@@ -125,8 +160,10 @@ export interface DraftRecord {
 export interface CreateTaskFromConsolePayload {
   fromNodeId?: string | null;
   instanceId?: string | null;
-  nodeType: DesignerGraphPayload["nodes"][number]["type"];
+  nodeType: BpmnNodeType;
   label: string;
+  conditionExpression?: string;
+  correlationKey?: string;
   assignedRole: Role;
   createdByRole: Role;
   patientName?: string;

@@ -57,17 +57,13 @@ export const toAuthPayload = (user: User): AuthPayload => ({
 const applySeed = (seed: MockDataSeed) => {
   mockStore.users = deepClone(seed.users);
   mockStore.definitions = deepClone(seed.definitions);
-  mockStore.instances = deepClone(seed.instances);
-  mockStore.tasks = deepClone(seed.tasks);
-  mockStore.audit = deepClone(seed.audit);
+  mockStore.instances = [];
+  mockStore.tasks = [];
+  mockStore.audit = [];
   mockStore.credentials = deepClone(seed.authCredentials);
   mockStore.designerGraph = deepClone(INITIAL_DESIGNER_GRAPH);
   mockStore.drafts = [];
-  mockStore.savedTasks = deepClone(seed.tasks).map((task) => ({
-    ...task,
-    updatedAt: task.updatedAt ?? task.createdAt,
-    processStatus: task.status === "completed" ? "closed" : "open",
-  }));
+  mockStore.savedTasks = [];
 };
 
 export const ensureInitialized = async () => {
@@ -78,64 +74,87 @@ export const ensureInitialized = async () => {
 };
 
 export const syncEmergencyTriageTasksFromDesigner = () => {
-  const triageUserTasks = getOrderedUserTaskNodes(mockStore.designerGraph);
-  const generatedEmergencyTasks: Task[] = triageUserTasks.map((node, index) => {
-    const now = Date.now();
-    const due = new Date(now + (index + 1) * 15 * 60 * 1000).toISOString();
-    const role = roleLabelToKey(node.data.role);
-
-    return {
-      id: `t-${node.id}`,
-      nodeId: node.id,
-      instanceId: "pi-designer-001",
-      definitionName: "Emergency Triage",
-      name: node.data.label ?? "User Task",
-      assignee: null,
-      role,
-      status: "pending",
-      priority: index === 0 ? "high" : "medium",
-      createdAt: new Date(now).toISOString(),
-      dueAt: due,
-      slaMinutes: 30,
-      minutesRemaining: 30 - index * 2,
-      patientName: "Generated from Designer",
-      patientId: `P-DES-${String(index + 1).padStart(3, "0")}`,
-      formFields: getFormFieldsForUserTask(node.data.label ?? "User Task", role),
-    };
+  const userTaskNodes = getOrderedUserTaskNodes(mockStore.designerGraph);
+  const byInstance = new Map<string, typeof userTaskNodes>();
+  userTaskNodes.forEach((node) => {
+    const instanceId = typeof node.data.instanceId === "string" && node.data.instanceId.length > 0
+      ? node.data.instanceId
+      : "pi-designer-001";
+    const list = byInstance.get(instanceId) ?? [];
+    list.push(node);
+    byInstance.set(instanceId, list);
   });
 
-  mockStore.tasks = generatedEmergencyTasks;
-  mockStore.savedTasks = generatedEmergencyTasks.map((task) => ({
+  const generatedEmergencyTasks: Task[] = [];
+  byInstance.forEach((nodes, instanceId) => {
+    nodes.forEach((node, index) => {
+      const now = Date.now();
+      const due = new Date(now + (index + 1) * 15 * 60 * 1000).toISOString();
+      const role = roleLabelToKey(node.data.role);
+      const statusFromNode = node.data.taskStatus;
+      const status = statusFromNode === "completed" || statusFromNode === "claimed" || statusFromNode === "pending"
+        ? statusFromNode
+        : "pending";
+
+      generatedEmergencyTasks.push({
+        id: `t-${node.id}`,
+        nodeId: node.id,
+        instanceId,
+        definitionName: "Emergency Triage",
+        name: node.data.label ?? "User Task",
+        assignee: null,
+        role,
+        status,
+        priority: index === 0 ? "high" : "medium",
+        createdAt: new Date(now).toISOString(),
+        dueAt: due,
+        slaMinutes: 30,
+        minutesRemaining: 30 - index * 2,
+        patientName: "Generated from Designer",
+        patientId: `P-DES-${String(index + 1).padStart(3, "0")}`,
+        formFields: getFormFieldsForUserTask(node.data.label ?? "User Task", role),
+      });
+    });
+  });
+
+  const affectedInstanceIds = new Set(byInstance.keys());
+
+  const unaffectedTasks = mockStore.tasks.filter((task) => !affectedInstanceIds.has(task.instanceId));
+  const unaffectedSavedTasks = mockStore.savedTasks.filter((task) => !affectedInstanceIds.has(task.instanceId));
+  const unaffectedInstances = mockStore.instances.filter((instance) => !affectedInstanceIds.has(instance.id));
+
+  mockStore.tasks = [...unaffectedTasks, ...generatedEmergencyTasks];
+  mockStore.savedTasks = [
+    ...unaffectedSavedTasks,
+    ...generatedEmergencyTasks.map((task) => ({
     ...task,
     updatedAt: task.updatedAt ?? new Date().toISOString(),
-    processStatus: "open" as const,
-  }));
+    processStatus: task.status === "completed" ? "closed" as const : "open" as const,
+    })),
+  ];
 
-  mockStore.instances = mockStore.instances.map((instance) => {
-    if (instance.definitionName !== "Emergency Triage") return instance;
-    return {
-      ...instance,
-      currentNode: triageUserTasks[0]?.data.label ?? "No Active User Task",
-    };
+  const nextInstances: ProcessInstance[] = [...unaffectedInstances];
+  byInstance.forEach((nodes, instanceId) => {
+    const firstNodeLabel = nodes[0]?.data.label ?? "No Active User Task";
+    const existing = mockStore.instances.find((instance) => instance.id === instanceId);
+    if (existing) {
+      nextInstances.push({ ...existing, currentNode: firstNodeLabel, status: "active" });
+      return;
+    }
+    nextInstances.push({
+      id: instanceId,
+      definitionId: "def1",
+      definitionName: "Emergency Triage",
+      status: "active",
+      startedAt: new Date().toISOString(),
+      startedBy: "System",
+      currentNode: firstNodeLabel,
+      priority: "medium",
+      patientId: "P-DES-ROOT",
+      patientName: "Designer Sandbox",
+    });
   });
-
-  if (!mockStore.instances.some((instance) => instance.id === "pi-designer-001")) {
-    mockStore.instances = [
-      ...mockStore.instances,
-      {
-        id: "pi-designer-001",
-        definitionId: "def1",
-        definitionName: "Emergency Triage",
-        status: "active",
-        startedAt: new Date().toISOString(),
-        startedBy: "System",
-        currentNode: triageUserTasks[0]?.data.label ?? "No Active User Task",
-        priority: "medium",
-        patientId: "P-DES-ROOT",
-        patientName: "Designer Sandbox",
-      },
-    ];
-  }
+  mockStore.instances = nextInstances;
 
   const taskStatusByNodeId = new Map<
     string,

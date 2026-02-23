@@ -1,5 +1,16 @@
-import { ROLE_LABELS } from "@/data/constants";
-import type { DesignerGraphPayload, Role, SavedTaskRecord, Task, User, FormField } from "@/data/mockData";
+import { BPMN_SUPPORTED_NODE_TYPES, ROLE_LABELS } from "@/data/constants";
+import type {
+  BpmnNodeType,
+  DesignerGraphNodeData,
+  DesignerGraphPayload,
+  EventDefinitionType,
+  GatewayDirection,
+  Role,
+  SavedTaskRecord,
+  Task,
+  User,
+  FormField,
+} from "@/data/mockData";
 
 export const INITIAL_DESIGNER_GRAPH: DesignerGraphPayload = {
   nodes: [],
@@ -7,6 +18,38 @@ export const INITIAL_DESIGNER_GRAPH: DesignerGraphPayload = {
 };
 
 export const deepClone = <T,>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
+
+export const isSupportedBpmnNodeType = (type: string): type is BpmnNodeType =>
+  BPMN_SUPPORTED_NODE_TYPES.includes(type as BpmnNodeType);
+
+const getEventDefinitionType = (nodeType: BpmnNodeType): EventDefinitionType => {
+  if (nodeType === "timerEvent") return "timer";
+  if (nodeType === "messageEvent") return "message";
+  if (nodeType === "signalEvent") return "signal";
+  return "none";
+};
+
+const getGatewayDirection = (nodeType: BpmnNodeType): GatewayDirection =>
+  nodeType === "xorGateway" || nodeType === "andGateway" ? "diverging" : "unspecified";
+
+export const buildBpmnNodeData = (
+  nodeType: BpmnNodeType,
+  input: {
+    label?: string;
+    role?: string;
+    taskStatus?: "pending" | "claimed" | "completed";
+    laneRef?: Exclude<Role, "admin">;
+    instanceId?: string;
+  }
+): DesignerGraphNodeData => ({
+  label: input.label,
+  role: input.role,
+  instanceId: input.instanceId,
+  taskStatus: input.taskStatus,
+  laneRef: input.laneRef,
+  eventDefinitionType: getEventDefinitionType(nodeType),
+  gatewayDirection: getGatewayDirection(nodeType),
+});
 
 export const roleLabelToKey = (value: string | undefined): Role => {
   const normalized = (value ?? "").trim().toLowerCase();
@@ -69,7 +112,15 @@ export const buildInstanceDesignerGraph = (instanceTasks: SavedTaskRecord[]): De
   const endPaddingX = 140;
 
   const nodes: DesignerGraphPayload["nodes"] = [
-    { id: `start-${ordered[0].instanceId}`, type: "startEvent", position: { x: startX, y: 180 }, width: 40, height: 40, style: { width: 40, height: 40 }, data: { label: "Start" } },
+    {
+      id: `start-${ordered[0].instanceId}`,
+      type: "startEvent",
+      position: { x: startX, y: 180 },
+      width: 40,
+      height: 40,
+      style: { width: 40, height: 40 },
+      data: buildBpmnNodeData("startEvent", { label: "Start", instanceId: ordered[0].instanceId }),
+    },
   ];
   const edges: DesignerGraphPayload["edges"] = [];
 
@@ -82,23 +133,34 @@ export const buildInstanceDesignerGraph = (instanceTasks: SavedTaskRecord[]): De
       width: 220,
       height: 110,
       style: { width: 220, height: 110 },
-      data: {
+      data: buildBpmnNodeData("userTask", {
         label: task.name,
         role: ROLE_LABELS[task.role],
         taskStatus: task.status === "completed" ? "completed" : task.status === "claimed" ? "claimed" : "pending",
-      },
+        laneRef: task.role === "admin" ? undefined : task.role,
+        instanceId: task.instanceId,
+      }),
     });
   });
 
   const endId = `end-${ordered[0].instanceId}`;
   const endX = taskStartX + ordered.length * taskSpacingX + endPaddingX;
-  nodes.push({ id: endId, type: "endEvent", position: { x: endX, y: 180 }, width: 40, height: 40, style: { width: 40, height: 40 }, data: { label: "End" } });
+  nodes.push({
+    id: endId,
+    type: "endEvent",
+    position: { x: endX, y: 180 },
+    width: 40,
+    height: 40,
+    style: { width: 40, height: 40 },
+    data: buildBpmnNodeData("endEvent", { label: "End", instanceId: ordered[0].instanceId }),
+  });
 
   const startId = `start-${ordered[0].instanceId}`;
   edges.push({
     id: `edge-${startId}-${ordered[0].id}`,
     source: startId,
     target: ordered[0].nodeId ?? `node-${ordered[0].id}`,
+    type: "sequenceFlow",
     markerEnd: { type: "arrowclosed" },
     style: { stroke: "hsl(220,68%,30%)" },
   });
@@ -108,6 +170,7 @@ export const buildInstanceDesignerGraph = (instanceTasks: SavedTaskRecord[]): De
       id: `edge-${ordered[i].id}-${ordered[i + 1].id}`,
       source: ordered[i].nodeId ?? `node-${ordered[i].id}`,
       target: ordered[i + 1].nodeId ?? `node-${ordered[i + 1].id}`,
+      type: "sequenceFlow",
       markerEnd: { type: "arrowclosed" },
       style: { stroke: "hsl(220,68%,30%)" },
     });
@@ -117,6 +180,7 @@ export const buildInstanceDesignerGraph = (instanceTasks: SavedTaskRecord[]): De
     id: `edge-${ordered[ordered.length - 1].id}-${endId}`,
     source: ordered[ordered.length - 1].nodeId ?? `node-${ordered[ordered.length - 1].id}`,
     target: endId,
+    type: "sequenceFlow",
     markerEnd: { type: "arrowclosed" },
     style: { stroke: "hsl(220,68%,30%)" },
   });
@@ -170,4 +234,57 @@ export const upsertSavedTask = (savedTasks: SavedTaskRecord[], task: Task, proce
     return clone;
   }
   return [next, ...savedTasks];
+};
+
+export const projectDesignerGraphByInstance = (
+  graph: DesignerGraphPayload,
+  instanceId: string
+): DesignerGraphPayload => {
+  const instanceNodeIds = new Set(
+    graph.nodes
+      .filter((node) => node.data.instanceId === instanceId)
+      .map((node) => node.id)
+  );
+
+  if (instanceNodeIds.size === 0) {
+    return deepClone(INITIAL_DESIGNER_GRAPH);
+  }
+
+  const nodes = graph.nodes.filter((node) => instanceNodeIds.has(node.id));
+  const edges = graph.edges.filter(
+    (edge) => instanceNodeIds.has(edge.source) && instanceNodeIds.has(edge.target)
+  );
+
+  return { nodes: deepClone(nodes), edges: deepClone(edges) };
+};
+
+export const mergeDesignerGraphByInstances = (
+  base: DesignerGraphPayload,
+  incoming: DesignerGraphPayload
+): DesignerGraphPayload => {
+  const affectedInstanceIds = new Set(
+    incoming.nodes
+      .map((node) => node.data.instanceId)
+      .filter((value): value is string => typeof value === "string" && value.length > 0)
+  );
+
+  if (affectedInstanceIds.size === 0) {
+    return deepClone(incoming);
+  }
+
+  const affectedBaseNodeIds = new Set(
+    base.nodes
+      .filter((node) => node.data.instanceId && affectedInstanceIds.has(node.data.instanceId))
+      .map((node) => node.id)
+  );
+
+  const preservedNodes = base.nodes.filter((node) => !affectedBaseNodeIds.has(node.id));
+  const preservedEdges = base.edges.filter(
+    (edge) => !affectedBaseNodeIds.has(edge.source) && !affectedBaseNodeIds.has(edge.target)
+  );
+
+  return {
+    nodes: [...deepClone(preservedNodes), ...deepClone(incoming.nodes)],
+    edges: [...deepClone(preservedEdges), ...deepClone(incoming.edges)],
+  };
 };

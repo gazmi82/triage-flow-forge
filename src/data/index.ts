@@ -4,5 +4,6 @@ export * from './mockApi';
 export * from './api';
 export * from './mockSeedApi';
 export * from './workflowLogic';
+export * from './bpmnValidation';
 export * from './queryClient';
 export * from './grpcContracts';

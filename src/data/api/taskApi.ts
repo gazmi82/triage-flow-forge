@@ -1,5 +1,15 @@
 import type { AuditEvent, CreateTaskFromConsolePayload, DesignerGraphPayload, ProcessInstance, SavedTaskRecord, Task } from "@/data/mockData";
-import { deepClone, getDefaultAssigneeForRole, getFormFieldsForUserTask, getRoleLabel, upsertSavedTask } from "@/data/workflowLogic";
+import { BPMN_SUPPORTED_EDGE_TYPES } from "@/data/constants";
+import {
+  buildBpmnNodeData,
+  deepClone,
+  getDefaultAssigneeForRole,
+  getFormFieldsForUserTask,
+  getRoleLabel,
+  projectDesignerGraphByInstance,
+  isSupportedBpmnNodeType,
+  upsertSavedTask,
+} from "@/data/workflowLogic";
 import { ensureInitialized, mockStore, sleep } from "@/data/api/state";
 
 export const taskApi = {
@@ -39,20 +49,37 @@ export const taskApi = {
     return {
       tasks: deepClone(mockStore.tasks),
       savedTasks: deepClone(mockStore.savedTasks),
-      graph: deepClone(mockStore.designerGraph),
+      graph: task ? projectDesignerGraphByInstance(mockStore.designerGraph, task.instanceId) : deepClone(mockStore.designerGraph),
       instances: deepClone(mockStore.instances),
       audit: deepClone(mockStore.audit),
     };
   },
 
-  async completeTask(taskId: string, actor: string): Promise<{ tasks: Task[]; savedTasks: SavedTaskRecord[]; audit: AuditEvent[]; graph: DesignerGraphPayload; instances: ProcessInstance[] }> {
+  async completeTask(
+    taskId: string,
+    actor: string,
+    patientName?: string,
+    patientId?: string
+  ): Promise<{ tasks: Task[]; savedTasks: SavedTaskRecord[]; audit: AuditEvent[]; graph: DesignerGraphPayload; instances: ProcessInstance[] }> {
     await ensureInitialized();
     await sleep();
     const completed = mockStore.tasks.find((task) => task.id === taskId);
 
     if (completed) {
+      const normalizedPatientName = patientName?.trim();
+      const normalizedPatientId = patientId?.trim();
+      const updatedAt = new Date().toISOString();
+
       mockStore.tasks = mockStore.tasks.map((task) =>
-        task.id === taskId ? { ...task, status: "completed", updatedAt: new Date().toISOString() } : task
+        task.id === taskId
+          ? {
+              ...task,
+              status: "completed",
+              patientName: normalizedPatientName || task.patientName,
+              patientId: normalizedPatientId || task.patientId,
+              updatedAt,
+            }
+          : task
       );
 
       if (completed.nodeId) {
@@ -63,6 +90,7 @@ export const taskApi = {
           ),
         };
       }
+      const completedSnapshot = mockStore.tasks.find((task) => task.id === taskId) ?? completed;
       mockStore.audit = [
         {
           id: `ae-${Date.now()}`,
@@ -77,11 +105,7 @@ export const taskApi = {
         },
         ...mockStore.audit,
       ];
-      mockStore.savedTasks = upsertSavedTask(
-        mockStore.savedTasks,
-        { ...completed, status: "completed", updatedAt: new Date().toISOString() },
-        "closed"
-      );
+      mockStore.savedTasks = upsertSavedTask(mockStore.savedTasks, { ...completedSnapshot }, "closed");
 
       mockStore.instances = mockStore.instances.map((instance) => {
         if (instance.id !== completed.instanceId) return instance;
@@ -90,6 +114,8 @@ export const taskApi = {
           ...instance,
           currentNode: nextTask?.name ?? "Completed",
           status: nextTask ? "active" : "completed",
+          patientName: normalizedPatientName || instance.patientName,
+          patientId: normalizedPatientId || instance.patientId,
         };
       });
     }
@@ -98,61 +124,118 @@ export const taskApi = {
       tasks: deepClone(mockStore.tasks),
       savedTasks: deepClone(mockStore.savedTasks),
       audit: deepClone(mockStore.audit),
-      graph: deepClone(mockStore.designerGraph),
+      graph: completed
+        ? projectDesignerGraphByInstance(mockStore.designerGraph, completed.instanceId)
+        : deepClone(mockStore.designerGraph),
       instances: deepClone(mockStore.instances),
     };
   },
 
-  async createTaskFromConsole(payload: CreateTaskFromConsolePayload): Promise<{ tasks: Task[]; savedTasks: SavedTaskRecord[]; graph: DesignerGraphPayload; instances: ProcessInstance[]; audit: AuditEvent[] }> {
+  async createTaskFromConsole(payload: CreateTaskFromConsolePayload): Promise<{
+    tasks: Task[];
+    savedTasks: SavedTaskRecord[];
+    graph: DesignerGraphPayload;
+    instances: ProcessInstance[];
+    audit: AuditEvent[];
+    createdNodeId: string;
+    instanceId: string;
+  }> {
     await ensureInitialized();
     await sleep();
+    if (!isSupportedBpmnNodeType(payload.nodeType)) {
+      throw new Error(`Unsupported BPMN node type: ${payload.nodeType}`);
+    }
+
+    if (!BPMN_SUPPORTED_EDGE_TYPES.includes("sequenceFlow")) {
+      throw new Error("sequenceFlow is not enabled in BPMN subset profile.");
+    }
+
     const timestamp = Date.now();
     const instanceId = payload.instanceId && payload.instanceId.trim().length > 0 ? payload.instanceId : `pi-flow-${timestamp}`;
     const newNodeId = `node-${timestamp}`;
-    const hasNodes = mockStore.designerGraph.nodes.length > 0;
-    const startNode = mockStore.designerGraph.nodes.find((node) => node.type === "startEvent");
-    const sourceNodeId = payload.fromNodeId && mockStore.designerGraph.nodes.some((n) => n.id === payload.fromNodeId)
-      ? payload.fromNodeId
-      : startNode?.id;
+    const instanceNodes = mockStore.designerGraph.nodes.filter((node) => node.data.instanceId === instanceId);
+    const hasInstanceNodes = instanceNodes.length > 0;
+    const startNode = instanceNodes.find((node) => node.type === "startEvent");
+
+    if (payload.nodeType === "startEvent" && startNode) {
+      throw new Error(`Instance '${instanceId}' already has a startEvent.`);
+    }
+
+    if (payload.fromNodeId && !instanceNodes.some((n) => n.id === payload.fromNodeId)) {
+      throw new Error(`Source node '${payload.fromNodeId}' not found in instance '${instanceId}'.`);
+    }
+
+    const sourceNodeId = payload.fromNodeId ?? startNode?.id;
 
     const newNode = {
       id: newNodeId,
       type: payload.nodeType,
       position: {
-        x: 220 + mockStore.designerGraph.nodes.length * 90,
-        y: 180 + (mockStore.designerGraph.nodes.length % 3) * 80,
+        x: 220 + instanceNodes.length * 90,
+        y: 180 + (instanceNodes.length % 3) * 80,
       },
       width: payload.nodeType === "userTask" ? 220 : 40,
       height: payload.nodeType === "userTask" ? 110 : 40,
       style: { width: payload.nodeType === "userTask" ? 220 : 40, height: payload.nodeType === "userTask" ? 110 : 40 },
       data: {
-        label: payload.label,
-        role: getRoleLabel(payload.assignedRole),
-        taskStatus: payload.nodeType === "userTask" ? "pending" as const : undefined,
+        ...buildBpmnNodeData(payload.nodeType, {
+          label: payload.label,
+          role: getRoleLabel(payload.assignedRole),
+          taskStatus: payload.nodeType === "userTask" ? "pending" : undefined,
+          laneRef: payload.assignedRole === "admin" ? undefined : payload.assignedRole,
+          instanceId,
+        }),
+        conditionExpression: payload.conditionExpression,
+        correlationKey: payload.correlationKey,
       },
     };
 
     const nodesToAdd: DesignerGraphPayload["nodes"] = [];
-    if (!hasNodes && payload.nodeType !== "startEvent") {
+    if (!hasInstanceNodes && payload.nodeType !== "startEvent") {
       nodesToAdd.push({
-        id: "start-root",
+        id: `start-${instanceId}`,
         type: "startEvent",
         position: { x: 80, y: 200 },
         width: 40,
         height: 40,
         style: { width: 40, height: 40 },
-        data: { label: "Start" },
+        data: buildBpmnNodeData("startEvent", { label: "Start", instanceId }),
       });
     }
     nodesToAdd.push(newNode);
 
     const edgesToAdd: DesignerGraphPayload["edges"] = [];
-    const resolvedSource = sourceNodeId ?? (nodesToAdd.find((n) => n.id === "start-root")?.id ?? null);
+    const resolvedSource = sourceNodeId ?? (nodesToAdd.find((n) => n.id === `start-${instanceId}`)?.id ?? null);
     if (resolvedSource && resolvedSource !== newNodeId) {
+      const sourceNode = mockStore.designerGraph.nodes.find((node) => node.id === resolvedSource);
+      const outgoingCount = mockStore.designerGraph.edges.filter((edge) => edge.source === resolvedSource).length;
+      const xorConditions =
+        sourceNode?.type === "xorGateway" && typeof sourceNode.data?.conditionExpression === "string"
+          ? sourceNode.data.conditionExpression
+              .split("|")
+              .map((part) => part.trim())
+              .filter(Boolean)
+          : [];
+      const xorDefaultLabel = `Condition ${String.fromCharCode(65 + outgoingCount)}`;
+      const xorEdgeLabel =
+        sourceNode?.type === "xorGateway"
+          ? xorConditions[outgoingCount] ?? (payload.conditionExpression?.trim() || xorDefaultLabel)
+          : undefined;
+
       edgesToAdd.push({
         id: `edge-${timestamp}`,
         source: resolvedSource,
         target: newNodeId,
+        type: "sequenceFlow",
+        label: xorEdgeLabel,
+        labelBgPadding: [6, 2],
+        labelBgBorderRadius: 4,
+        labelBgStyle: { fill: "rgba(255,255,255,0.92)" },
+        labelStyle: {
+          fontSize: 11,
+          fontWeight: 600,
+          fill: "hsl(220,68%,30%)",
+        },
         markerEnd: { type: "arrowclosed" },
         style: { stroke: "hsl(220,68%,30%)" },
       });
@@ -243,9 +326,11 @@ export const taskApi = {
     return {
       tasks: deepClone(mockStore.tasks),
       savedTasks: deepClone(mockStore.savedTasks),
-      graph: deepClone(mockStore.designerGraph),
+      graph: projectDesignerGraphByInstance(mockStore.designerGraph, instanceId),
       instances: deepClone(mockStore.instances),
       audit: deepClone(mockStore.audit),
+      createdNodeId: newNodeId,
+      instanceId,
     };
   },
 };

@@ -6,27 +6,60 @@ import { Save, Play, CheckCircle, History, ChevronDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { publishDesignerThunk, saveDraftThunk } from "@/store/slices/workflowSlice";
+import { validateDesignerGraphPayload } from "@/data/bpmnValidation";
+import type { DesignerGraphEdge, DesignerGraphNode, DesignerGraphPayload } from "@/data/mockData";
 
 export function DesignerToolbar() {
   const [saved, setSaved] = useState(false);
   const { toast } = useToast();
   const dispatch = useAppDispatch();
   const nodes = useAppSelector((state) => state.workflow.designerNodes);
+  const edges = useAppSelector((state) => state.workflow.designerEdges);
 
   const handleSave = async () => {
-    await dispatch(saveDraftThunk());
-    setSaved(true);
-    toast({ title: "Process saved", description: "Draft v4 saved successfully." });
-    setTimeout(() => setSaved(false), 3000);
+    const result = await dispatch(saveDraftThunk());
+    if (saveDraftThunk.fulfilled.match(result)) {
+      setSaved(true);
+      toast({ title: "Process saved", description: "Draft saved successfully." });
+      setTimeout(() => setSaved(false), 3000);
+      return;
+    }
+    toast({
+      title: "Save blocked by BPMN rules",
+      description: result.error.message ?? "Draft contains invalid BPMN structure.",
+      variant: "destructive",
+    });
   };
 
   const handleValidate = () => {
-    toast({ title: "Validation passed", description: `All ${nodes.length} nodes validated against supported BPMN subset.` });
+    const graph: DesignerGraphPayload = {
+      nodes: nodes as unknown as DesignerGraphNode[],
+      edges: edges as unknown as DesignerGraphEdge[],
+    };
+    const result = validateDesignerGraphPayload(graph, "publish");
+    if (result.valid) {
+      toast({ title: "Validation passed", description: `All ${nodes.length} nodes satisfy BPMN subset publish rules.` });
+      return;
+    }
+
+    toast({
+      title: "Validation failed",
+      description: result.errors.slice(0, 2).join(" "),
+      variant: "destructive",
+    });
   };
 
   const handlePublish = async () => {
-    await dispatch(publishDesignerThunk());
-    toast({ title: "Process published", description: "Emergency Triage v4 published. Task Console synced from user tasks." });
+    const result = await dispatch(publishDesignerThunk());
+    if (publishDesignerThunk.fulfilled.match(result)) {
+      toast({ title: "Process published", description: "Emergency Triage published. Task Console synced from user tasks." });
+      return;
+    }
+    toast({
+      title: "Publish blocked by BPMN rules",
+      description: result.error.message ?? "Graph does not pass BPMN subset validation.",
+      variant: "destructive",
+    });
   };
 
   return (
