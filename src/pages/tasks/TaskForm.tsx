@@ -5,6 +5,12 @@ import { ROLE_LABELS } from "@/data/constants";
 import type { Role, Task } from "@/data/mockData";
 import type { TaskNodeType } from "@/pages/tasks/types";
 import {
+  buildRequiredFieldErrors,
+  EventConfigService,
+  findFirstStringFieldValue,
+  GatewayConfigService,
+} from "@/pages/tasks/task-form/services";
+import {
   Button,
   Checkbox,
   Input,
@@ -22,6 +28,9 @@ interface TaskFormProps {
   selectedNodeType: TaskNodeType;
   onComplete: (payload: {
     redirectRole: Role;
+    branchARole?: Role;
+    branchBRole?: Role;
+    xorSelectedCondition?: "critical" | "non_critical";
     patientName?: string;
     patientId?: string;
     conditionExpression?: string;
@@ -36,18 +45,20 @@ export function TaskForm({ task, selectedNodeType, onComplete, onSaveDraft }: Ta
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [redirectRole, setRedirectRole] = useState<Role | "">("");
   const [showRedirectAccordion, setShowRedirectAccordion] = useState(true);
-  const [conditionA, setConditionA] = useState("");
-  const [conditionB, setConditionB] = useState("");
   const [correlationKey, setCorrelationKey] = useState("");
+  const [branchARole, setBranchARole] = useState<Role | "">("");
+  const [branchBRole, setBranchBRole] = useState<Role | "">("");
+  const [xorSelectedCondition, setXorSelectedCondition] = useState<"critical" | "non_critical" | "">("");
 
   const resetForm = useCallback(() => {
     setValues({});
     setErrors({});
     setRedirectRole("");
     setShowRedirectAccordion(true);
-    setConditionA("");
-    setConditionB("");
     setCorrelationKey("");
+    setBranchARole("");
+    setBranchBRole("");
+    setXorSelectedCondition("");
   }, []);
 
   useEffect(() => {
@@ -64,34 +75,14 @@ export function TaskForm({ task, selectedNodeType, onComplete, onSaveDraft }: Ta
   };
 
   const validate = () => {
-    const nextErrors: Record<string, string> = {};
-    for (const field of task.formFields) {
-      if (!field.required) continue;
-      const value = values[field.id];
-      if (field.type === "boolean") {
-        if (typeof value !== "boolean") nextErrors[field.id] = "This field is required.";
-        continue;
-      }
-      if (typeof value !== "string" || value.trim().length === 0) {
-        nextErrors[field.id] = "This field is required.";
-      }
-    }
+    const nextErrors = buildRequiredFieldErrors(task.formFields, values);
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };
 
-  const findStringFieldValue = (candidates: string[], labelHints: string[]) => {
-    for (const candidate of candidates) {
-      const value = values[candidate];
-      if (typeof value === "string" && value.trim().length > 0) return value.trim();
-    }
-    for (const field of task.formFields) {
-      const fieldLabel = field.label.toLowerCase();
-      if (!labelHints.some((hint) => fieldLabel.includes(hint))) continue;
-      const value = values[field.id];
-      if (typeof value === "string" && value.trim().length > 0) return value.trim();
-    }
-    return undefined;
+  const getStringValue = (fieldId: string): string => {
+    const value = values[fieldId];
+    return typeof value === "string" ? value : "";
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -104,7 +95,16 @@ export function TaskForm({ task, selectedNodeType, onComplete, onSaveDraft }: Ta
       });
       return;
     }
-    if (!redirectRole) {
+    if (selectedNodeType === "andGateway") {
+      if (!branchARole || !branchBRole) {
+        toast({
+          title: "AND roles required",
+          description: "Assign a role for both Branch A and Branch B before completing the task.",
+          variant: "destructive",
+        });
+        return;
+      }
+    } else if (selectedNodeType !== "xorGateway" && !redirectRole) {
       toast({
         title: "Redirect role required",
         description: "Select the next role before completing the task.",
@@ -112,14 +112,49 @@ export function TaskForm({ task, selectedNodeType, onComplete, onSaveDraft }: Ta
       });
       return;
     }
+    if (selectedNodeType === "xorGateway") {
+      if (!branchARole || !branchBRole) {
+        toast({
+          title: "XOR roles required",
+          description: "Assign a role for Critical and Non Critical paths.",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (!xorSelectedCondition) {
+        toast({
+          title: "Select active condition",
+          description: "Choose whether this completion follows Condition A or Condition B.",
+          variant: "destructive",
+        });
+        return;
+      }
+    }
+    if (selectedNodeType === "messageEvent" && correlationKey.trim().length === 0) {
+      toast({
+        title: "Correlation key required",
+        description: "Message events require a correlation key.",
+        variant: "destructive",
+      });
+      return;
+    }
     toast({ title: "Task completed", description: `"${task.name}" has been completed and the process advanced.` });
     await onComplete({
-      redirectRole,
-      patientName: findStringFieldValue(["patient_name", "patientName"], ["patient name"]),
-      patientId: findStringFieldValue(["patient_id", "patientId"], ["patient id"]),
+      redirectRole: redirectRole || branchARole || task.role,
+      branchARole: selectedNodeType === "andGateway" ? (branchARole || undefined) : undefined,
+      branchBRole: selectedNodeType === "andGateway" ? (branchBRole || undefined) : undefined,
+      xorSelectedCondition: selectedNodeType === "xorGateway" ? (xorSelectedCondition || undefined) : undefined,
+      ...(selectedNodeType === "xorGateway"
+        ? {
+            branchARole: branchARole || undefined,
+            branchBRole: branchBRole || undefined,
+          }
+        : null),
+      patientName: findFirstStringFieldValue(task.formFields, values, ["patient_name", "patientName"], ["patient name"]),
+      patientId: findFirstStringFieldValue(task.formFields, values, ["patient_id", "patientId"], ["patient id"]),
       conditionExpression:
         selectedNodeType === "xorGateway"
-          ? [conditionA.trim(), conditionB.trim()].filter(Boolean).join(" | ")
+          ? "critical | non_critical"
           : undefined,
       correlationKey: selectedNodeType === "messageEvent" ? correlationKey.trim() || undefined : undefined,
     });
@@ -138,7 +173,7 @@ export function TaskForm({ task, selectedNodeType, onComplete, onSaveDraft }: Ta
           {field.type === "text" && (
             <Input
               className="h-8 text-sm"
-              value={typeof values[field.id] === "string" ? values[field.id] : ""}
+              value={getStringValue(field.id)}
               onChange={(e) => setFieldValue(field.id, e.target.value)}
               aria-invalid={Boolean(errors[field.id])}
             />
@@ -148,7 +183,7 @@ export function TaskForm({ task, selectedNodeType, onComplete, onSaveDraft }: Ta
             <Input
               type="number"
               className="h-8 text-sm"
-              value={typeof values[field.id] === "string" ? values[field.id] : ""}
+              value={getStringValue(field.id)}
               onChange={(e) => setFieldValue(field.id, e.target.value)}
               aria-invalid={Boolean(errors[field.id])}
             />
@@ -157,7 +192,7 @@ export function TaskForm({ task, selectedNodeType, onComplete, onSaveDraft }: Ta
           {field.type === "textarea" && (
             <Textarea
               className="min-h-[72px] text-sm"
-              value={typeof values[field.id] === "string" ? values[field.id] : ""}
+              value={getStringValue(field.id)}
               onChange={(e) => setFieldValue(field.id, e.target.value)}
               aria-invalid={Boolean(errors[field.id])}
             />
@@ -165,7 +200,7 @@ export function TaskForm({ task, selectedNodeType, onComplete, onSaveDraft }: Ta
 
           {field.type === "select" && (
             <Select
-              value={typeof values[field.id] === "string" ? values[field.id] : undefined}
+              value={getStringValue(field.id) || undefined}
               onValueChange={(value) => setFieldValue(field.id, value)}
             >
               <SelectTrigger className="h-8 text-sm" aria-invalid={Boolean(errors[field.id])}>
@@ -199,64 +234,23 @@ export function TaskForm({ task, selectedNodeType, onComplete, onSaveDraft }: Ta
         </div>
       ))}
 
-      {selectedNodeType !== "userTask" && (
-        <div className="space-y-2 rounded-md border border-border bg-card p-2.5">
-          <p className="text-xs font-semibold">
-            {selectedNodeType === "xorGateway" || selectedNodeType === "andGateway"
-              ? "Gateway Configuration"
-              : "Event Configuration"}
-          </p>
+      <GatewayConfigService
+        selectedNodeType={selectedNodeType}
+        branchARole={branchARole}
+        branchBRole={branchBRole}
+        xorSelectedCondition={xorSelectedCondition}
+        onBranchARoleChange={setBranchARole}
+        onBranchBRoleChange={setBranchBRole}
+        onXorSelectedConditionChange={setXorSelectedCondition}
+      />
 
-          {selectedNodeType === "xorGateway" && (
-            <>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Condition A</Label>
-                <Input
-                  className="h-8 text-sm"
-                  placeholder="critical"
-                  value={conditionA}
-                  onChange={(e) => setConditionA(e.target.value)}
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs">Condition B</Label>
-                <Input
-                  className="h-8 text-sm"
-                  placeholder="non_critical"
-                  value={conditionB}
-                  onChange={(e) => setConditionB(e.target.value)}
-                />
-              </div>
-            </>
-          )}
+      <EventConfigService
+        selectedNodeType={selectedNodeType}
+        correlationKey={correlationKey}
+        onCorrelationKeyChange={setCorrelationKey}
+      />
 
-          {selectedNodeType === "messageEvent" && (
-            <div className="space-y-1.5">
-              <Label className="text-xs">Correlation Key</Label>
-              <Input
-                className="h-8 text-sm"
-                placeholder="patient_id or order_id"
-                value={correlationKey}
-                onChange={(e) => setCorrelationKey(e.target.value)}
-              />
-            </div>
-          )}
-
-          {selectedNodeType === "timerEvent" && (
-            <p className="text-xs text-muted-foreground">Timer event will be inserted before next routed task.</p>
-          )}
-          {selectedNodeType === "signalEvent" && (
-            <p className="text-xs text-muted-foreground">Signal event will be inserted before next routed task.</p>
-          )}
-          {selectedNodeType === "andGateway" && (
-            <p className="text-xs text-muted-foreground">AND gateway will branch in parallel to downstream tasks.</p>
-          )}
-          {selectedNodeType === "endEvent" && (
-            <p className="text-xs text-muted-foreground">End event will close this path after current task completion.</p>
-          )}
-        </div>
-      )}
-
+      {selectedNodeType !== "xorGateway" && selectedNodeType !== "andGateway" && (
       <div className="space-y-2 rounded-md border border-border bg-card p-2.5">
         <button
           type="button"
@@ -289,6 +283,7 @@ export function TaskForm({ task, selectedNodeType, onComplete, onSaveDraft }: Ta
           </div>
         )}
       </div>
+      )}
 
       <div className="flex gap-2 pt-2">
         <Button type="submit" size="sm" className="gap-1.5">

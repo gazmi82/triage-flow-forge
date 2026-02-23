@@ -5,3 +5,4 @@ export * from './TaskForm';
 export * from './TaskInbox';
 export * from './NodeConfigForm';
 export * from './types';
+export * from './task-form/services';

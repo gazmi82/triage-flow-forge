@@ -1,4 +1,5 @@
 export * from './NavLink';
 export * from './designer';
-export * from './layout';
+export { Sidebar as AppSidebar } from './layout';
+export { TopNavbar } from './layout';
 export * from './ui';

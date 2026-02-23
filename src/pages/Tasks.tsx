@@ -83,6 +83,9 @@ export default function Tasks() {
 
   const completeTask = async (payload: {
     redirectRole: Role;
+    branchARole?: Role;
+    branchBRole?: Role;
+    xorSelectedCondition?: "critical" | "non_critical";
     patientName?: string;
     patientId?: string;
     conditionExpression?: string;
@@ -119,7 +122,64 @@ export default function Tasks() {
 
     if (!createTaskFromConsoleThunk.fulfilled.match(createNodeResult)) return;
 
-    if (selectedNodeType !== "userTask" && selectedNodeType !== "endEvent") {
+    if (selectedNodeType === "andGateway" && payload.branchARole && payload.branchBRole) {
+      await dispatch(
+        createTaskFromConsoleThunk({
+          fromNodeId: createNodeResult.payload.createdNodeId,
+          instanceId: completedTask.instanceId,
+          nodeType: "userTask",
+          label: `${ROLE_LABELS[payload.branchARole]} Task`,
+          assignedRole: payload.branchARole,
+          createdByRole: user?.role ?? "triage_nurse",
+          patientName: payload.patientName ?? completedTask.patientName,
+          patientId: payload.patientId ?? completedTask.patientId,
+          registrationNote: "Auto-generated after andGateway branch A",
+        })
+      );
+      await dispatch(
+        createTaskFromConsoleThunk({
+          fromNodeId: createNodeResult.payload.createdNodeId,
+          instanceId: completedTask.instanceId,
+          nodeType: "userTask",
+          label: `${ROLE_LABELS[payload.branchBRole]} Task`,
+          assignedRole: payload.branchBRole,
+          createdByRole: user?.role ?? "triage_nurse",
+          patientName: payload.patientName ?? completedTask.patientName,
+          patientId: payload.patientId ?? completedTask.patientId,
+          registrationNote: "Auto-generated after andGateway branch B",
+        })
+      );
+    } else if (
+      selectedNodeType === "xorGateway" &&
+      payload.branchARole &&
+      payload.branchBRole &&
+      payload.conditionExpression &&
+      payload.xorSelectedCondition
+    ) {
+      const xorConditions = payload.conditionExpression
+        .split("|")
+        .map((part) => part.trim())
+        .filter(Boolean);
+      const selectedCondition =
+        payload.xorSelectedCondition === "critical" ? xorConditions[0] : xorConditions[1];
+      const selectedRole =
+        payload.xorSelectedCondition === "critical" ? payload.branchARole : payload.branchBRole;
+
+      await dispatch(
+        createTaskFromConsoleThunk({
+          fromNodeId: createNodeResult.payload.createdNodeId,
+          instanceId: completedTask.instanceId,
+          nodeType: "userTask",
+          label: `${ROLE_LABELS[selectedRole]} Task`,
+          conditionExpression: selectedCondition,
+          assignedRole: selectedRole,
+          createdByRole: user?.role ?? "triage_nurse",
+          patientName: payload.patientName ?? completedTask.patientName,
+          patientId: payload.patientId ?? completedTask.patientId,
+          registrationNote: `Auto-generated after xorGateway (${selectedCondition})`,
+        })
+      );
+    } else if (selectedNodeType !== "userTask" && selectedNodeType !== "endEvent") {
       await dispatch(
         createTaskFromConsoleThunk({
           fromNodeId: createNodeResult.payload.createdNodeId,
@@ -135,7 +195,17 @@ export default function Tasks() {
       );
     }
 
-    toast({ title: "Task progressed", description: `Redirected to ${ROLE_LABELS[payload.redirectRole]}.` });
+    toast({
+      title: "Task progressed",
+      description:
+        selectedNodeType === "andGateway" && payload.branchARole && payload.branchBRole
+          ? `Parallel branches created for ${ROLE_LABELS[payload.branchARole]} and ${ROLE_LABELS[payload.branchBRole]}.`
+          : selectedNodeType === "xorGateway" && payload.xorSelectedCondition && payload.branchARole && payload.branchBRole
+            ? `XOR routed via ${payload.xorSelectedCondition === "critical" ? "Critical" : "Non Critical"} to ${
+                ROLE_LABELS[payload.xorSelectedCondition === "critical" ? payload.branchARole : payload.branchBRole]
+              }.`
+          : `Redirected to ${ROLE_LABELS[payload.redirectRole]}.`,
+    });
     setShowTimeline(false);
   };
 

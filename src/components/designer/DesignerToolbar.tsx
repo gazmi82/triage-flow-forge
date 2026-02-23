@@ -11,12 +11,28 @@ import type { DesignerGraphEdge, DesignerGraphNode, DesignerGraphPayload } from 
 
 export function DesignerToolbar() {
   const [saved, setSaved] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const { toast } = useToast();
   const dispatch = useAppDispatch();
   const nodes = useAppSelector((state) => state.workflow.designerNodes);
   const edges = useAppSelector((state) => state.workflow.designerEdges);
 
   const handleSave = async () => {
+    const graph: DesignerGraphPayload = {
+      nodes: nodes as unknown as DesignerGraphNode[],
+      edges: edges as unknown as DesignerGraphEdge[],
+    };
+    const validation = validateDesignerGraphPayload(graph, "draft");
+    if (!validation.valid) {
+      setValidationErrors(validation.errors);
+      toast({
+        title: "Save blocked by BPMN rules",
+        description: `Found ${validation.errors.length} violation(s).`,
+        variant: "destructive",
+      });
+      return;
+    }
+    setValidationErrors([]);
     const result = await dispatch(saveDraftThunk());
     if (saveDraftThunk.fulfilled.match(result)) {
       setSaved(true);
@@ -38,9 +54,11 @@ export function DesignerToolbar() {
     };
     const result = validateDesignerGraphPayload(graph, "publish");
     if (result.valid) {
+      setValidationErrors([]);
       toast({ title: "Validation passed", description: `All ${nodes.length} nodes satisfy BPMN subset publish rules.` });
       return;
     }
+    setValidationErrors(result.errors);
 
     toast({
       title: "Validation failed",
@@ -50,6 +68,21 @@ export function DesignerToolbar() {
   };
 
   const handlePublish = async () => {
+    const graph: DesignerGraphPayload = {
+      nodes: nodes as unknown as DesignerGraphNode[],
+      edges: edges as unknown as DesignerGraphEdge[],
+    };
+    const validation = validateDesignerGraphPayload(graph, "publish");
+    if (!validation.valid) {
+      setValidationErrors(validation.errors);
+      toast({
+        title: "Publish blocked by BPMN rules",
+        description: `Found ${validation.errors.length} violation(s).`,
+        variant: "destructive",
+      });
+      return;
+    }
+    setValidationErrors([]);
     const result = await dispatch(publishDesignerThunk());
     if (publishDesignerThunk.fulfilled.match(result)) {
       toast({ title: "Process published", description: "Emergency Triage published. Task Console synced from user tasks." });
@@ -63,37 +96,52 @@ export function DesignerToolbar() {
   };
 
   return (
-    <div className="flex items-center gap-2 border-b border-border bg-card px-4 py-2">
-      <div className="flex-1">
-        <div className="flex items-center gap-2">
-          <p className="text-sm font-semibold">Emergency Triage</p>
-          <Badge variant="outline" className="text-[10px] h-5">v4 (draft)</Badge>
+    <div className="border-b border-border bg-card">
+      <div className="flex items-center gap-2 px-4 py-2">
+        <div className="flex-1">
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-semibold">Emergency Triage</p>
+            <Badge variant="outline" className="text-[10px] h-5">v4 (draft)</Badge>
+          </div>
+          <p className="text-[10px] text-muted-foreground">key: emergency_triage · definition-service</p>
         </div>
-        <p className="text-[10px] text-muted-foreground">key: emergency_triage · definition-service</p>
+
+        <Separator orientation="vertical" className="h-6" />
+
+        <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs">
+          <History className="h-3.5 w-3.5" />
+          History
+        </Button>
+
+        <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs" onClick={handleValidate}>
+          <CheckCircle className="h-3.5 w-3.5" />
+          Validate
+        </Button>
+
+        <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={handleSave}>
+          <Save className="h-3.5 w-3.5" />
+          {saved ? "Saved!" : "Save Draft"}
+        </Button>
+
+        <Button size="sm" className="h-8 gap-1.5 text-xs" onClick={handlePublish}>
+          <Play className="h-3.5 w-3.5" />
+          Publish
+          <ChevronDown className="h-3 w-3" />
+        </Button>
       </div>
 
-      <Separator orientation="vertical" className="h-6" />
-
-      <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs">
-        <History className="h-3.5 w-3.5" />
-        History
-      </Button>
-
-      <Button variant="ghost" size="sm" className="h-8 gap-1.5 text-xs" onClick={handleValidate}>
-        <CheckCircle className="h-3.5 w-3.5" />
-        Validate
-      </Button>
-
-      <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs" onClick={handleSave}>
-        <Save className="h-3.5 w-3.5" />
-        {saved ? "Saved!" : "Save Draft"}
-      </Button>
-
-      <Button size="sm" className="h-8 gap-1.5 text-xs" onClick={handlePublish}>
-        <Play className="h-3.5 w-3.5" />
-        Publish
-        <ChevronDown className="h-3 w-3" />
-      </Button>
+      {validationErrors.length > 0 && (
+        <div className="border-t border-destructive/30 bg-destructive/5 px-4 py-2">
+          <p className="text-xs font-semibold text-destructive">
+            Validation violations ({validationErrors.length})
+          </p>
+          <ul className="mt-1 max-h-28 list-disc space-y-0.5 overflow-auto pl-4 text-[11px] text-destructive/90">
+            {validationErrors.map((error) => (
+              <li key={error}>{error}</li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import {
   ReactFlow,
   Background,
@@ -28,6 +28,19 @@ export function DesignerCanvas() {
     }
   }, [dispatch, hasBootstrapped, isLoading]);
 
+  const renderedEdges = useMemo(
+    () =>
+      edges.map((edge) => ({
+        ...edge,
+        type: "smoothstep",
+        pathOptions: {
+          borderRadius: 0,
+          offset: 28,
+        },
+      })),
+    [edges]
+  );
+
   return (
     <div className="flex h-full">
       <div className="flex flex-1 flex-col">
@@ -35,7 +48,7 @@ export function DesignerCanvas() {
         <div className="flex-1">
           <ReactFlow
             nodes={nodes}
-            edges={edges}
+            edges={renderedEdges}
             nodeTypes={NODE_TYPES}
             fitView
             nodesDraggable={false}

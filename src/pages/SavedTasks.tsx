@@ -12,12 +12,12 @@ import { useAuth } from "@/hooks";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { bootstrapWorkflowThunk, loadDraftThunk, openTaskDesignerThunk } from "@/store/slices/workflowSlice";
 import { FileText, Grid3X3, List, Search } from "lucide-react";
+import { ROLE_LABELS } from "@/data/constants";
 
 type SortField = "createdAt" | "updatedAt";
 type SortDirection = "asc" | "desc";
 type ViewMode = "table" | "cards";
 type ProcessStatus = "all" | "open" | "closed";
-const isGenericTaskName = (name: string) => /^user task/i.test(name.trim());
 const isGeneratedPatientName = (name: string) => /^generated from task console$/i.test(name.trim());
 
 export default function SavedTasks() {
@@ -78,12 +78,7 @@ export default function SavedTasks() {
     navigate("/designer");
   };
 
-  const getTaskTitle = (task: (typeof filtered)[number]) => {
-    if (isGenericTaskName(task.name) && !isGeneratedPatientName(task.patientName)) {
-      return task.patientName;
-    }
-    return task.name;
-  };
+  const getTaskTitle = (task: (typeof filtered)[number]) => ROLE_LABELS[task.role];
 
   const getPatientDisplayName = (task: (typeof filtered)[number]) => {
     if (!isGeneratedPatientName(task.patientName)) return task.patientName;

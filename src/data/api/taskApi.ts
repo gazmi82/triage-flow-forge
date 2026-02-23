@@ -1,6 +1,7 @@
 import type { AuditEvent, CreateTaskFromConsolePayload, DesignerGraphPayload, ProcessInstance, SavedTaskRecord, Task } from "@/data/mockData";
 import { BPMN_SUPPORTED_EDGE_TYPES } from "@/data/constants";
 import {
+  applyRuntimeStateForInstance,
   buildBpmnNodeData,
   deepClone,
   getDefaultAssigneeForRole,
@@ -44,6 +45,22 @@ export const taskApi = {
       ];
 
       mockStore.savedTasks = upsertSavedTask(mockStore.savedTasks, task, "open");
+
+      const taskStatusByNodeId = new Map(
+        mockStore.tasks
+          .filter((item) => item.instanceId === task.instanceId && item.nodeId)
+          .map((item) => [item.nodeId as string, item.status])
+      );
+      const runtime = applyRuntimeStateForInstance(mockStore.designerGraph, task.instanceId, taskStatusByNodeId);
+      mockStore.designerGraph = runtime.graph;
+      mockStore.instances = mockStore.instances.map((instance) =>
+        instance.id === task.instanceId
+          ? {
+              ...instance,
+              currentNode: runtime.activeNodeLabels[0] ?? instance.currentNode,
+            }
+          : instance
+      );
     }
 
     return {
@@ -118,6 +135,38 @@ export const taskApi = {
           patientId: normalizedPatientId || instance.patientId,
         };
       });
+
+      const taskStatusByNodeId = new Map(
+        mockStore.tasks
+          .filter((item) => item.instanceId === completed.instanceId && item.nodeId)
+          .map((item) => [item.nodeId as string, item.status])
+      );
+      const runtime = applyRuntimeStateForInstance(mockStore.designerGraph, completed.instanceId, taskStatusByNodeId);
+      mockStore.designerGraph = runtime.graph;
+      mockStore.instances = mockStore.instances.map((instance) =>
+        instance.id === completed.instanceId
+          ? {
+              ...instance,
+              currentNode: runtime.activeNodeLabels[0] ?? "Completed",
+              status: runtime.activeNodeLabels.length > 0 ? "active" : "completed",
+            }
+          : instance
+      );
+
+      const runtimeAuditEvents = runtime.events.map((event) => ({
+        id: `ae-${Date.now()}-${event.nodeId}`,
+        instanceId: completed.instanceId,
+        timestamp: new Date().toISOString(),
+        actor: "Runtime Engine",
+        role: completed.role,
+        eventType: event.eventType,
+        nodeId: event.nodeId,
+        nodeName: event.nodeLabel,
+        payload: { source: "token_traversal" },
+      }));
+      if (runtimeAuditEvents.length > 0) {
+        mockStore.audit = [...runtimeAuditEvents, ...mockStore.audit];
+      }
     }
 
     return {
@@ -149,6 +198,12 @@ export const taskApi = {
     if (!BPMN_SUPPORTED_EDGE_TYPES.includes("sequenceFlow")) {
       throw new Error("sequenceFlow is not enabled in BPMN subset profile.");
     }
+    if (payload.nodeType === "messageEvent" && (!payload.correlationKey || payload.correlationKey.trim().length === 0)) {
+      throw new Error("Message event requires correlationKey.");
+    }
+    if (payload.nodeType === "xorGateway" && (!payload.conditionExpression || payload.conditionExpression.trim().length === 0)) {
+      throw new Error("XOR gateway requires conditionExpression.");
+    }
 
     const timestamp = Date.now();
     const instanceId = payload.instanceId && payload.instanceId.trim().length > 0 ? payload.instanceId : `pi-flow-${timestamp}`;
@@ -166,17 +221,71 @@ export const taskApi = {
     }
 
     const sourceNodeId = payload.fromNodeId ?? startNode?.id;
+    const sourceNode = sourceNodeId
+      ? [...mockStore.designerGraph.nodes].find((node) => node.id === sourceNodeId)
+      : undefined;
+    const outgoingCountFromSource = sourceNodeId
+      ? mockStore.designerGraph.edges.filter((edge) => edge.source === sourceNodeId).length
+      : 0;
+
+    const getNodeSize = (nodeType: CreateTaskFromConsolePayload["nodeType"]) => {
+      if (nodeType === "userTask") return { width: 220, height: 110 };
+      if (nodeType === "xorGateway" || nodeType === "andGateway") return { width: 64, height: 64 };
+      return { width: 40, height: 40 };
+    };
+    const doesOverlap = (
+      candidate: { x: number; y: number; width: number; height: number },
+      node: (typeof instanceNodes)[number]
+    ) => {
+      const nodeWidth = typeof node.width === "number" ? node.width : Number(node.style?.width ?? 80);
+      const nodeHeight = typeof node.height === "number" ? node.height : Number(node.style?.height ?? 80);
+      return !(
+        candidate.x + candidate.width + 36 < node.position.x ||
+        node.position.x + nodeWidth + 36 < candidate.x ||
+        candidate.y + candidate.height + 28 < node.position.y ||
+        node.position.y + nodeHeight + 28 < candidate.y
+      );
+    };
+    const getBranchOffset = (branchIndex: number) => {
+      if (branchIndex === 0) return -170;
+      if (branchIndex === 1) return 170;
+      const level = Math.floor((branchIndex - 2) / 2) + 2;
+      return branchIndex % 2 === 0 ? -170 * level : 170 * level;
+    };
+    const computePosition = () => {
+      const size = getNodeSize(payload.nodeType);
+      let x = 220 + instanceNodes.length * 320;
+      let y = 180;
+
+      if (sourceNode) {
+        const sourceWidth =
+          typeof sourceNode.width === "number" ? sourceNode.width : Number(sourceNode.style?.width ?? 120);
+        x = sourceNode.position.x + sourceWidth + 140;
+        y = sourceNode.position.y;
+        if (sourceNode.type === "xorGateway" || sourceNode.type === "andGateway") {
+          y = sourceNode.position.y + getBranchOffset(outgoingCountFromSource);
+        }
+      }
+
+      const candidate = { x, y, width: size.width, height: size.height };
+      while (instanceNodes.some((node) => doesOverlap(candidate, node))) {
+        candidate.y += 140;
+      }
+
+      return { x: candidate.x, y: candidate.y, ...size };
+    };
+    const nodePlacement = computePosition();
 
     const newNode = {
       id: newNodeId,
       type: payload.nodeType,
       position: {
-        x: 220 + instanceNodes.length * 90,
-        y: 180 + (instanceNodes.length % 3) * 80,
+        x: nodePlacement.x,
+        y: nodePlacement.y,
       },
-      width: payload.nodeType === "userTask" ? 220 : 40,
-      height: payload.nodeType === "userTask" ? 110 : 40,
-      style: { width: payload.nodeType === "userTask" ? 220 : 40, height: payload.nodeType === "userTask" ? 110 : 40 },
+      width: nodePlacement.width,
+      height: nodePlacement.height,
+      style: { width: nodePlacement.width, height: nodePlacement.height },
       data: {
         ...buildBpmnNodeData(payload.nodeType, {
           label: payload.label,
@@ -207,27 +316,36 @@ export const taskApi = {
     const edgesToAdd: DesignerGraphPayload["edges"] = [];
     const resolvedSource = sourceNodeId ?? (nodesToAdd.find((n) => n.id === `start-${instanceId}`)?.id ?? null);
     if (resolvedSource && resolvedSource !== newNodeId) {
-      const sourceNode = mockStore.designerGraph.nodes.find((node) => node.id === resolvedSource);
+      const sourceNodeForLabel = mockStore.designerGraph.nodes.find((node) => node.id === resolvedSource);
       const outgoingCount = mockStore.designerGraph.edges.filter((edge) => edge.source === resolvedSource).length;
       const xorConditions =
-        sourceNode?.type === "xorGateway" && typeof sourceNode.data?.conditionExpression === "string"
-          ? sourceNode.data.conditionExpression
+        sourceNodeForLabel?.type === "xorGateway" && typeof sourceNodeForLabel.data?.conditionExpression === "string"
+          ? sourceNodeForLabel.data.conditionExpression
               .split("|")
               .map((part) => part.trim())
               .filter(Boolean)
           : [];
       const xorDefaultLabel = `Condition ${String.fromCharCode(65 + outgoingCount)}`;
       const xorEdgeLabel =
-        sourceNode?.type === "xorGateway"
-          ? xorConditions[outgoingCount] ?? (payload.conditionExpression?.trim() || xorDefaultLabel)
+        sourceNodeForLabel?.type === "xorGateway"
+          ? (payload.conditionExpression?.trim() || xorConditions[outgoingCount] || xorDefaultLabel)
+          : undefined;
+      const andEdgeLabel =
+        sourceNodeForLabel?.type === "andGateway" ? `Branch ${String.fromCharCode(65 + outgoingCount)}` : undefined;
+      const andSourceHandle =
+        sourceNodeForLabel?.type === "andGateway"
+          ? outgoingCount % 2 === 0
+            ? "top"
+            : "bottom"
           : undefined;
 
       edgesToAdd.push({
         id: `edge-${timestamp}`,
         source: resolvedSource,
         target: newNodeId,
+        sourceHandle: andSourceHandle,
         type: "sequenceFlow",
-        label: xorEdgeLabel,
+        label: xorEdgeLabel ?? andEdgeLabel,
         labelBgPadding: [6, 2],
         labelBgBorderRadius: 4,
         labelBgStyle: { fill: "rgba(255,255,255,0.92)" },
@@ -299,6 +417,38 @@ export const taskApi = {
         },
         ...mockStore.audit,
       ];
+    } else {
+      const eventType =
+        payload.nodeType === "timerEvent"
+          ? "timer_fired"
+          : payload.nodeType === "signalEvent"
+            ? "signal_received"
+            : payload.nodeType === "messageEvent"
+              ? "task_created"
+              : payload.nodeType === "xorGateway" || payload.nodeType === "andGateway"
+                ? "gateway_passed"
+                : null;
+      if (eventType) {
+        mockStore.audit = [
+          {
+            id: `ae-${Date.now()}`,
+            instanceId,
+            timestamp: new Date().toISOString(),
+            actor: "System",
+            role: payload.createdByRole,
+            eventType,
+            nodeId: newNodeId,
+            nodeName: payload.label,
+            payload: {
+              source: "runtime_engine",
+              correlationKey: payload.correlationKey,
+              conditionExpression: payload.conditionExpression,
+              nodeType: payload.nodeType,
+            },
+          },
+          ...mockStore.audit,
+        ];
+      }
     }
 
     if (!mockStore.instances.some((instance) => instance.id === instanceId)) {
@@ -322,6 +472,22 @@ export const taskApi = {
         instance.id === instanceId ? { ...instance, currentNode: payload.label } : instance
       );
     }
+
+    const taskStatusByNodeId = new Map(
+      mockStore.tasks
+        .filter((item) => item.instanceId === instanceId && item.nodeId)
+        .map((item) => [item.nodeId as string, item.status])
+    );
+    const runtime = applyRuntimeStateForInstance(mockStore.designerGraph, instanceId, taskStatusByNodeId);
+    mockStore.designerGraph = runtime.graph;
+    mockStore.instances = mockStore.instances.map((instance) =>
+      instance.id === instanceId
+        ? {
+            ...instance,
+            currentNode: runtime.activeNodeLabels[0] ?? instance.currentNode,
+          }
+        : instance
+    );
 
     return {
       tasks: deepClone(mockStore.tasks),

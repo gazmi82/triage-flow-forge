@@ -95,6 +95,11 @@ export const validateDesignerGraphPayload = (
       if (node.data.eventDefinitionType !== expected) {
         errors.push(`Node '${node.id}' must set eventDefinitionType='${expected}'.`);
       }
+      if (mode === "publish" && node.type === "messageEvent") {
+        if (typeof node.data.correlationKey !== "string" || node.data.correlationKey.trim().length === 0) {
+          errors.push(`Message event '${node.id}' must define a correlationKey.`);
+        }
+      }
     }
 
     if (node.type in expectedGatewayDirectionByNode) {
@@ -156,4 +161,3 @@ export const validateDesignerGraphPayload = (
 
   return { valid: errors.length === 0, errors };
 };
-

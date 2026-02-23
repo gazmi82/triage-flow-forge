@@ -94,7 +94,7 @@ export interface AuditEvent {
   timestamp: string;
   actor: string;
   role: Role;
-  eventType: "instance_started" | "task_created" | "task_claimed" | "task_completed" | "timer_fired" | "signal_received" | "gateway_passed";
+  eventType: "instance_started" | "task_created" | "task_claimed" | "task_completed" | "timer_fired" | "message_received" | "signal_received" | "gateway_passed";
   nodeId: string;
   nodeName: string;
   payload?: Record<string, unknown>;
@@ -118,6 +118,7 @@ export interface DesignerGraphNodeData extends Record<string, unknown> {
   role?: string;
   instanceId?: string;
   taskStatus?: DesignerTaskStatus;
+  runtimeActive?: boolean;
   eventDefinitionType?: EventDefinitionType;
   gatewayDirection?: GatewayDirection;
   laneRef?: Exclude<Role, "admin">;
@@ -139,6 +140,8 @@ export interface DesignerGraphEdge {
   id: string;
   source: string;
   target: string;
+  sourceHandle?: string;
+  targetHandle?: string;
   type?: BpmnEdgeType;
   label?: string;
   labelStyle?: Record<string, string | number>;

@@ -15,6 +15,7 @@ export function AuditTimeline({ instanceId, events }: { instanceId: string; even
     task_claimed: <User className="h-3.5 w-3.5 text-accent" />,
     task_completed: <CheckCircle2 className="h-3.5 w-3.5 text-success" />,
     timer_fired: <Clock className="h-3.5 w-3.5 text-warning" />,
+    message_received: <Milestone className="h-3.5 w-3.5 text-node-message" />,
     gateway_passed: <ChevronRight className="h-3.5 w-3.5 text-node-gateway-xor" />,
     signal_received: <AlertTriangle className="h-3.5 w-3.5 text-node-message" />,
   };
