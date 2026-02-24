@@ -1,9 +1,9 @@
 import type { Role } from "@/data/mockData";
 
-export const APP_NAV_ROUTES = ["/", "/designer", "/tasks", "/draft", "/saved-tasks", "/instances", "/admin"] as const;
+export const APP_NAV_ROUTES = ["/", "/designer", "/tasks", "/draft", "/saved-tasks", "/instances", "/admin", "/docs"] as const;
 export type AppNavRoute = (typeof APP_NAV_ROUTES)[number];
 
-const NON_ADMIN_ALLOWED: AppNavRoute[] = ["/designer", "/tasks", "/draft", "/saved-tasks"];
+const NON_ADMIN_ALLOWED: AppNavRoute[] = ["/designer", "/tasks", "/draft", "/saved-tasks", "/docs"];
 
 export const ROUTE_TITLES: Record<AppNavRoute, string> = {
   "/": "Dashboard",
@@ -13,6 +13,7 @@ export const ROUTE_TITLES: Record<AppNavRoute, string> = {
   "/saved-tasks": "Saved Tasks",
   "/instances": "Instance Monitor",
   "/admin": "Administration",
+  "/docs": "Documentation",
 };
 
 export function isAdminRole(role?: Role | null): boolean {

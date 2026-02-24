@@ -8,6 +8,7 @@ import {
   Archive,
   Users,
   Activity,
+  BookOpen,
   ChevronRight,
   Hospital,
   LogOut,
@@ -26,6 +27,7 @@ const NAV_ITEMS: Array<{ to: AppNavRoute; icon: LucideIcon; label: string }> = [
   { to: "/saved-tasks", icon: Archive, label: "Saved Tasks" },
   { to: "/instances", icon: Activity, label: "Instances" },
   { to: "/admin", icon: Users, label: "Admin" },
+  { to: "/docs", icon: BookOpen, label: "Documentation" },
 ];
 
 export function Sidebar() {

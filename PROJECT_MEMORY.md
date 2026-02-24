@@ -105,17 +105,18 @@ Check these in order:
 - `63bc924` (2026-02-24): Stabilized triage workflow state, routing, and task-console API architecture.
 - Outcome: Current stable baseline for triage workflow behavior and data-flow reliability.
 
-## Update Protocol (Every 2 New Commits)
-When there are 2 new commits on `main`, update this file immediately.
+## Update Protocol (Every 5 New Commits)
+When there are 5 new commits on `main`, update this file immediately.
 
 1. Collect new commits:
 ```bash
-git --no-pager log --oneline --decorate -n 2
+git --no-pager log --oneline --decorate -n 5
 ```
 2. Append next checkpoint with:
 - commit hashes + date + subject
 - 2-5 bullets of what changed (files/modules/features)
 - 1 short “Outcome” line
+4. For future entries, use 5-commit checkpoints.
 3. Update `Scope` line at top with latest commit hash/date.
 
 ## Authoring Rules For Future Updates
