@@ -1,18 +1,44 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { type Role } from "@/data/mockData";
 import { RoleBadge, StatusBadge } from "@/components/ui/Badges";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { GitBranch, Users, CheckCircle2, XCircle, Plus } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
-import { bootstrapWorkflowThunk } from "@/store/slices/workflowSlice";
+import { bootstrapWorkflowThunk, createUserThunk } from "@/store/slices/workflowSlice";
+import { ROLE_LABELS } from "@/data/constants";
+import { useToast } from "@/hooks";
 
 export default function Admin() {
   const dispatch = useAppDispatch();
+  const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("definitions");
+  const [isCreateUserOpen, setIsCreateUserOpen] = useState(false);
+  const [createUserForm, setCreateUserForm] = useState({
+    name: "",
+    email: "",
+    password: "",
+    role: "triage_nurse" as Role,
+    department: "Emergency",
+  });
+  const [createUserError, setCreateUserError] = useState<string | null>(null);
+  const [isSubmittingCreateUser, setIsSubmittingCreateUser] = useState(false);
   const users = useAppSelector((state) => state.workflow.users);
   const definitions = useAppSelector((state) => state.workflow.definitions);
+  const instances = useAppSelector((state) => state.workflow.instances);
+  const tasks = useAppSelector((state) => state.workflow.tasks);
   const hasBootstrapped = useAppSelector((state) => state.workflow.hasBootstrapped);
   const isLoading = useAppSelector((state) => state.workflow.isLoading);
 
@@ -21,6 +47,87 @@ export default function Admin() {
       dispatch(bootstrapWorkflowThunk());
     }
   }, [dispatch, hasBootstrapped, isLoading]);
+
+  const roles: Role[] = useMemo(
+    () => ["reception", "triage_nurse", "physician", "lab", "radiology", "admin"],
+    []
+  );
+
+  const definitionInstanceCounts = useMemo(
+    () =>
+      instances.reduce<Record<string, number>>((acc, instance) => {
+        acc[instance.definitionId] = (acc[instance.definitionId] ?? 0) + 1;
+        return acc;
+      }, {}),
+    [instances]
+  );
+
+  const roleMetrics = useMemo(() => {
+    return roles.map((role) => {
+      const roleUsers = users.filter((user) => user.role === role);
+      const roleTasks = tasks.filter((task) => task.role === role);
+      const roleActiveInstances = instances.filter((instance) =>
+        role === "admin"
+          ? true
+          : roleTasks.some((task) => task.instanceId === instance.id) && instance.status === "active"
+      );
+      return {
+        role,
+        totalUsers: roleUsers.length,
+        activeUsers: roleUsers.filter((user) => user.active).length,
+        openTasks: roleTasks.filter((task) => task.status !== "completed").length,
+        claimedTasks: roleTasks.filter((task) => task.status === "claimed").length,
+        overdueTasks: roleTasks.filter((task) => task.status === "overdue").length,
+        activeInstances: role === "admin" ? instances.filter((instance) => instance.status === "active").length : roleActiveInstances.length,
+      };
+    });
+  }, [instances, roles, tasks, users]);
+
+  const resetCreateUserForm = () => {
+    setCreateUserForm({
+      name: "",
+      email: "",
+      password: "",
+      role: "triage_nurse",
+      department: "Emergency",
+    });
+    setCreateUserError(null);
+  };
+
+  const handleCreateUser = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setCreateUserError(null);
+
+    if (createUserForm.password.length < 6) {
+      setCreateUserError("Password must be at least 6 characters.");
+      return;
+    }
+
+    setIsSubmittingCreateUser(true);
+    const result = await dispatch(
+      createUserThunk({
+        name: createUserForm.name,
+        email: createUserForm.email,
+        password: createUserForm.password,
+        role: createUserForm.role,
+        department: createUserForm.department,
+        active: true,
+      })
+    );
+    setIsSubmittingCreateUser(false);
+
+    if (createUserThunk.rejected.match(result)) {
+      setCreateUserError(result.error.message ?? "Unable to create user.");
+      return;
+    }
+
+    toast({
+      title: "User created",
+      description: `${result.payload.createdUser.name} was added as ${ROLE_LABELS[result.payload.createdUser.role]}.`,
+    });
+    setIsCreateUserOpen(false);
+    resetCreateUserForm();
+  };
 
   return (
     <div className="h-full overflow-y-auto p-6 space-y-6">
@@ -47,10 +154,7 @@ export default function Admin() {
             <div className="border-b border-border px-4 py-3 flex items-center gap-2">
               <GitBranch className="h-4 w-4 text-muted-foreground" />
               <p className="text-sm font-semibold">Process Registry</p>
-              <Button size="sm" className="ml-auto h-7 text-xs gap-1.5">
-                <Plus className="h-3 w-3" />
-                New Definition
-              </Button>
+              <Badge variant="secondary" className="ml-auto text-xs">{definitions.length} definitions</Badge>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
@@ -87,13 +191,12 @@ export default function Admin() {
                           ))}
                         </div>
                       </td>
-                      <td className="px-4 py-3 font-semibold">{def.instanceCount}</td>
+                      <td className="px-4 py-3 font-semibold">{definitionInstanceCounts[def.id] ?? 0}</td>
                       <td className="px-4 py-3 text-muted-foreground">{new Date(def.updatedAt).toLocaleDateString()}</td>
                       <td className="px-4 py-3">
-                        <div className="flex gap-1">
-                          <Button variant="outline" size="sm" className="h-7 text-[10px]">Edit</Button>
-                          <Button variant="ghost" size="sm" className="h-7 text-[10px]">Clone</Button>
-                        </div>
+                        <Badge variant="outline" className="text-[10px]">
+                          {definitionInstanceCounts[def.id] ?? 0} live references
+                        </Badge>
                       </td>
                     </tr>
                   ))}
@@ -105,43 +208,58 @@ export default function Admin() {
 
         {/* Users Tab */}
         <TabsContent value="users" className="mt-4 space-y-4">
-          {/* Role matrix */}
+          <div className="flex justify-end">
+            <Button
+              size="sm"
+              className="h-8 gap-1.5 text-xs"
+              onClick={() => {
+                resetCreateUserForm();
+                setIsCreateUserOpen(true);
+              }}
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add User
+            </Button>
+          </div>
+
+          {/* Role workload matrix */}
           <div className="rounded-lg border border-border bg-card overflow-hidden">
             <div className="border-b border-border px-4 py-3">
-              <p className="text-sm font-semibold">RBAC Role Permissions</p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">Lane access matrix for process tasks</p>
+              <p className="text-sm font-semibold">Role Workload Matrix</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">Live operational metrics by role</p>
             </div>
             <div className="overflow-x-auto p-4">
               <table className="text-xs w-full">
                 <thead>
                   <tr>
                     <th className="text-left pb-2 font-semibold text-muted-foreground w-40">Role</th>
-                    {["Registration", "Triage", "Assessment", "Lab Orders", "Lab Analysis", "Imaging", "Discharge"].map(p => (
-                      <th key={p} className="text-center pb-2 font-semibold text-muted-foreground px-2">{p}</th>
-                    ))}
+                    <th className="text-center pb-2 font-semibold text-muted-foreground px-2">Active Users</th>
+                    <th className="text-center pb-2 font-semibold text-muted-foreground px-2">Total Users</th>
+                    <th className="text-center pb-2 font-semibold text-muted-foreground px-2">Open Tasks</th>
+                    <th className="text-center pb-2 font-semibold text-muted-foreground px-2">Claimed</th>
+                    <th className="text-center pb-2 font-semibold text-muted-foreground px-2">Overdue</th>
+                    <th className="text-center pb-2 font-semibold text-muted-foreground px-2">Active Instances</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {[
-                    { role: "reception" as Role, perms: [true, false, false, false, false, false, false] },
-                    { role: "triage_nurse" as Role, perms: [false, true, false, false, false, false, false] },
-                    { role: "physician" as Role, perms: [false, false, true, true, false, true, true] },
-                    { role: "lab" as Role, perms: [false, false, false, false, true, false, false] },
-                    { role: "radiology" as Role, perms: [false, false, false, false, false, true, false] },
-                    { role: "admin" as Role, perms: [true, true, true, true, true, true, true] },
-                  ].map(({ role, perms }) => (
-                    <tr key={role} className="hover:bg-muted/30">
-                      <td className="py-2"><RoleBadge role={role} /></td>
-                      {perms.map((p, i) => (
-                        <td key={i} className="text-center py-2">
-                          {p
-                            ? <CheckCircle2 className="h-4 w-4 text-success mx-auto" />
-                            : <XCircle className="h-4 w-4 text-muted-foreground/30 mx-auto" />
-                          }
-                        </td>
-                      ))}
+                  {roleMetrics.map((metrics) => (
+                    <tr key={metrics.role} className="hover:bg-muted/30">
+                      <td className="py-2"><RoleBadge role={metrics.role} /></td>
+                      <td className="text-center py-2">{metrics.activeUsers}</td>
+                      <td className="text-center py-2">{metrics.totalUsers}</td>
+                      <td className="text-center py-2">{metrics.openTasks}</td>
+                      <td className="text-center py-2">{metrics.claimedTasks}</td>
+                      <td className="text-center py-2">{metrics.overdueTasks}</td>
+                      <td className="text-center py-2">{metrics.activeInstances}</td>
                     </tr>
                   ))}
+                  {roleMetrics.length === 0 && (
+                    <tr>
+                      <td colSpan={7} className="py-4 text-center text-muted-foreground">
+                        No role data available.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -152,10 +270,9 @@ export default function Admin() {
             <div className="border-b border-border px-4 py-3 flex items-center gap-2">
               <Users className="h-4 w-4 text-muted-foreground" />
               <p className="text-sm font-semibold">Users</p>
-              <Button size="sm" className="ml-auto h-7 text-xs gap-1.5">
-                <Plus className="h-3 w-3" />
-                Add User
-              </Button>
+              <Badge variant="secondary" className="ml-auto text-xs">
+                {users.filter((user) => user.active).length} active / {users.length} total
+              </Badge>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
@@ -190,16 +307,111 @@ export default function Admin() {
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <Button variant="ghost" size="sm" className="h-7 text-[10px]">Edit</Button>
+                        <p className="text-[10px] text-muted-foreground">{ROLE_LABELS[user.role]}</p>
                       </td>
                     </tr>
                   ))}
+                  {users.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">
+                        No users found.
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
           </div>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={isCreateUserOpen} onOpenChange={setIsCreateUserOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add User</DialogTitle>
+            <DialogDescription>Create a new user account and assign role access.</DialogDescription>
+          </DialogHeader>
+          <form className="space-y-4" onSubmit={handleCreateUser}>
+            <div className="space-y-1.5">
+              <Label htmlFor="admin-user-name">Full Name</Label>
+              <Input
+                id="admin-user-name"
+                value={createUserForm.name}
+                onChange={(event) => setCreateUserForm((prev) => ({ ...prev, name: event.target.value }))}
+                placeholder="Alex Carter"
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="admin-user-email">Email</Label>
+              <Input
+                id="admin-user-email"
+                type="email"
+                value={createUserForm.email}
+                onChange={(event) => setCreateUserForm((prev) => ({ ...prev, email: event.target.value }))}
+                placeholder="alex.carter@hospital.org"
+                required
+              />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <Label htmlFor="admin-user-role">Role</Label>
+                <Select
+                  value={createUserForm.role}
+                  onValueChange={(value: Role) => setCreateUserForm((prev) => ({ ...prev, role: value }))}
+                >
+                  <SelectTrigger id="admin-user-role">
+                    <SelectValue placeholder="Select role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="reception">Reception</SelectItem>
+                    <SelectItem value="triage_nurse">Triage Nurse</SelectItem>
+                    <SelectItem value="physician">Physician</SelectItem>
+                    <SelectItem value="lab">Laboratory</SelectItem>
+                    <SelectItem value="radiology">Radiology</SelectItem>
+                    <SelectItem value="admin">Administrator</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="admin-user-department">Department</Label>
+                <Input
+                  id="admin-user-department"
+                  value={createUserForm.department}
+                  onChange={(event) => setCreateUserForm((prev) => ({ ...prev, department: event.target.value }))}
+                  placeholder="Emergency"
+                  required
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="admin-user-password">Temporary Password</Label>
+              <Input
+                id="admin-user-password"
+                type="password"
+                value={createUserForm.password}
+                onChange={(event) => setCreateUserForm((prev) => ({ ...prev, password: event.target.value }))}
+                placeholder="At least 6 characters"
+                required
+              />
+            </div>
+            {createUserError && <p className="text-xs text-destructive">{createUserError}</p>}
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsCreateUserOpen(false)}
+                disabled={isSubmittingCreateUser}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isSubmittingCreateUser}>
+                {isSubmittingCreateUser ? "Creating..." : "Create User"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

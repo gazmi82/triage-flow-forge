@@ -12,6 +12,8 @@ import {
 import { appQueryClient } from "@/data/queryClient";
 import { mockApi } from "@/data/mockApi";
 import {
+  type AdminCreateUserRequest,
+  type AdminCreateUserResponse,
   type AuditEvent,
   type BpmnNodeType,
   type DraftRecord,
@@ -78,6 +80,7 @@ type OpenTaskDesignerPayload = {
   taskId: string;
   graph: Awaited<ReturnType<typeof mockApi.fetchTaskDesignerGraph>>;
 };
+type CreateUserPayload = AdminCreateUserResponse;
 
 export const bootstrapWorkflowThunk = createAsyncThunk<BootstrapPayload>("workflow/bootstrap", async () => {
   return await appQueryClient.fetchQuery({
@@ -173,6 +176,13 @@ export const openTaskDesignerThunk = createAsyncThunk<OpenTaskDesignerPayload, {
   async (payload) => {
     const graph = await mockApi.fetchTaskDesignerGraph(payload.taskId);
     return { taskId: payload.taskId, graph };
+  }
+);
+
+export const createUserThunk = createAsyncThunk<CreateUserPayload, AdminCreateUserRequest>(
+  "workflow/createUser",
+  async (payload) => {
+    return await mockApi.createUser(payload);
   }
 );
 
@@ -319,6 +329,13 @@ const workflowSlice = createSlice({
       })
       .addCase(openTaskDesignerThunk.rejected, (state, action) => {
         state.error = action.error.message ?? "Unable to open designer for task.";
+      })
+      .addCase(createUserThunk.fulfilled, (state, action) => {
+        state.users = action.payload.users;
+        state.error = null;
+      })
+      .addCase(createUserThunk.rejected, (state, action) => {
+        state.error = action.error.message ?? "Unable to create user.";
       });
   },
 });

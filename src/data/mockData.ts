@@ -112,6 +112,20 @@ export interface AuthPayload {
   department: string;
 }
 
+export interface AdminCreateUserRequest {
+  name: string;
+  email: string;
+  password: string;
+  role: Role;
+  department: string;
+  active?: boolean;
+}
+
+export interface AdminCreateUserResponse {
+  users: User[];
+  createdUser: User;
+}
+
 export interface DesignerGraphPayload {
   nodes: DesignerGraphNode[];
   edges: DesignerGraphEdge[];

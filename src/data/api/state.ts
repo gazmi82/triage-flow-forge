@@ -61,6 +61,7 @@ export const toAuthPayload = (user: User): AuthPayload => ({
 const applySeed = (seed: MockDataSeed) => {
   mockStore.users = deepClone(seed.users);
   mockStore.definitions = deepClone(seed.definitions);
+  // Runtime starts empty by design; dashboard/activity should populate only from user actions.
   mockStore.instances = [];
   mockStore.tasks = [];
   mockStore.audit = [];

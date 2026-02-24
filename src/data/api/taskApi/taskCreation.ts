@@ -16,6 +16,25 @@ import {
 } from "@/data/workflowLogic";
 import { ensureInitialized, mockStore, sleep } from "@/data/api/state";
 
+const getPreferredCurrentNodeForInstance = (instanceId: string): string | null => {
+  const openTasks = mockStore.tasks.filter((task) => task.instanceId === instanceId && task.status !== "completed");
+  if (openTasks.length === 0) return null;
+
+  const score = (task: Task) => {
+    if (task.status === "claimed") return 0;
+    if (task.status === "overdue") return 1;
+    return 2;
+  };
+
+  const prioritized = [...openTasks].sort((a, b) => {
+    const statusDiff = score(a) - score(b);
+    if (statusDiff !== 0) return statusDiff;
+    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+  });
+
+  return prioritized[0]?.name ?? null;
+};
+
 export async function createTaskFromConsole(payload: CreateTaskFromConsolePayload): Promise<{
   tasks: Task[];
   savedTasks: SavedTaskRecord[];
@@ -373,7 +392,10 @@ export async function createTaskFromConsole(payload: CreateTaskFromConsolePayloa
     instance.id === instanceId
       ? {
           ...instance,
-          currentNode: runtime.activeNodeLabels[0] ?? instance.currentNode,
+          currentNode:
+            getPreferredCurrentNodeForInstance(instanceId) ??
+            runtime.activeNodeLabels[0] ??
+            instance.currentNode,
         }
       : instance
   );

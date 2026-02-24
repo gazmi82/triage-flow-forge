@@ -42,11 +42,14 @@ export function TopNavbar() {
   const title = getRouteTitle(location.pathname);
   const isAdmin = isAdminRole(user?.role);
   const isTaskConsole = location.pathname === "/tasks";
+  const workspaceSubtitle = user
+    ? `${user.department} · ${isAdmin ? "Admin Access" : "Role Workspace"}`
+    : "Authenticated workspace";
 
   const showNotImplemented = (label: string) => {
     toast({
-      title: `${label} (mock)`,
-      description: "This action is a UI placeholder in the mock build.",
+      title: `${label} unavailable`,
+      description: "This action is not implemented yet.",
     });
   };
 
@@ -55,7 +58,7 @@ export function TopNavbar() {
       <div className="min-w-0">
         <p className="truncate text-sm font-semibold">{title}</p>
         <p className="truncate text-[11px] text-muted-foreground">
-          Mock authenticated workspace
+          {workspaceSubtitle}
         </p>
       </div>
 

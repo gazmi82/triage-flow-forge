@@ -3,3 +3,4 @@ export * from './readApi';
 export * from './designerApi';
 export * from './taskApi';
 export * from './authApi';
+export * from './adminApi';

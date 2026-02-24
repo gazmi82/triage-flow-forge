@@ -18,6 +18,25 @@ type TaskApiResponse = {
   audit: AuditEvent[];
 };
 
+const getPreferredCurrentNodeForInstance = (instanceId: string): string | null => {
+  const openTasks = mockStore.tasks.filter((task) => task.instanceId === instanceId && task.status !== "completed");
+  if (openTasks.length === 0) return null;
+
+  const score = (task: Task) => {
+    if (task.status === "claimed") return 0;
+    if (task.status === "overdue") return 1;
+    return 2;
+  };
+
+  const prioritized = [...openTasks].sort((a, b) => {
+    const statusDiff = score(a) - score(b);
+    if (statusDiff !== 0) return statusDiff;
+    return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+  });
+
+  return prioritized[0]?.name ?? null;
+};
+
 export async function claimTask(taskId: string, assigneeName: string): Promise<TaskApiResponse> {
   await ensureInitialized();
   await sleep();
@@ -61,7 +80,10 @@ export async function claimTask(taskId: string, assigneeName: string): Promise<T
       instance.id === task.instanceId
         ? {
             ...instance,
-            currentNode: runtime.activeNodeLabels[0] ?? instance.currentNode,
+            currentNode:
+              getPreferredCurrentNodeForInstance(task.instanceId) ??
+              runtime.activeNodeLabels[0] ??
+              instance.currentNode,
           }
         : instance
     );
@@ -147,12 +169,16 @@ export async function completeTask(
     );
     const runtime = applyRuntimeStateForInstance(mockStore.designerGraph, completed.instanceId, taskStatusByNodeId);
     mockStore.designerGraph = runtime.graph;
+    const preferredCurrentNode = getPreferredCurrentNodeForInstance(completed.instanceId);
     mockStore.instances = mockStore.instances.map((instance) =>
       instance.id === completed.instanceId
         ? {
-            ...instance,
-            currentNode: runtime.activeNodeLabels[0] ?? "Completed",
-            status: runtime.activeNodeLabels.length > 0 ? "active" : "completed",
+          ...instance,
+            currentNode:
+              preferredCurrentNode ??
+              runtime.activeNodeLabels[0] ??
+              "Completed",
+            status: (preferredCurrentNode ?? runtime.activeNodeLabels[0]) ? "active" : "completed",
           }
         : instance
     );

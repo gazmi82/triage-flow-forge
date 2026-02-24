@@ -1,12 +1,12 @@
 {
-  "schemaVersion": "1.3.0",
+  "schemaVersion": "1.4.0",
   "definition": {
-    "id": "def.emergency_triage.v5",
+    "id": "def.emergency_triage.v6",
     "key": "emergency_triage",
     "name": "Emergency Triage",
-    "version": 5,
+    "version": 6,
     "status": "draft",
-    "description": "Task Console is the entry point. Process Designer is a read-only projection of task-created nodes.",
+    "description": "Task Console is the entry point. Process Designer is a read-only projection of task-created nodes. Admin includes user provisioning with role assignment.",
     "lanes": [
       "reception",
       "triage_nurse",
@@ -33,7 +33,8 @@
             "draft",
             "saved_tasks",
             "instance_monitor",
-            "admin"
+            "admin",
+            "docs"
           ]
         },
         {
@@ -42,7 +43,8 @@
             "process_designer",
             "task_console",
             "draft",
-            "saved_tasks"
+            "saved_tasks",
+            "docs"
           ]
         }
       ]
@@ -113,6 +115,28 @@
         "scopeKey": "instanceId",
         "includesAllTasksInInstance": true
       }
+    },
+    "adminConsole": {
+      "usersAndRoles": {
+        "createUser": {
+          "enabled": true,
+          "fields": [
+            "name",
+            "email",
+            "password",
+            "role",
+            "department"
+          ],
+          "validations": {
+            "nameMinLength": 2,
+            "emailFormat": "required",
+            "emailUnique": true,
+            "passwordMinLength": 6,
+            "departmentMinLength": 2
+          },
+          "defaultActiveStatus": true
+        }
+      }
     }
   },
   "stateManagement": {
@@ -124,7 +148,9 @@
       "designer_publish_to_task_console": "publish rebuilds task list from userTask nodes",
       "draft_save_load": "save stores graph snapshots; load injects snapshot into designer state",
       "task_redirect_to_designer": "opening process design from a task loads the graph for that task instanceId",
-      "saved_tasks_registry": "saved tasks keeps all task records with process status and supports process redirection"
+      "saved_tasks_registry": "saved tasks keeps all task records with process status and supports process redirection",
+      "admin_user_create": "admin create-user writes user + credential records and updates workflow users state",
+      "active_instance_projection": "active/open instance summaries are derived from non-completed tasks, not only persisted instance status"
     }
   },
   "bpmnSubsetProfile": {
