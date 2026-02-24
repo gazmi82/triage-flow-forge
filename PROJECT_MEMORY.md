@@ -14,6 +14,43 @@ Core capabilities:
 - Saved tasks + draft process states + instance monitor + admin views.
 - Mock API domain split (`read`, `designer`, `task`, `auth`) with shared in-memory state.
 
+## Quick Rehydrate Map (If Chat Memory Resets)
+Check these in order:
+
+1. App shell + routing
+- `src/App.tsx`
+- `src/components/layout/`
+- `src/pages/Auth.tsx`
+
+2. State and orchestration
+- `src/store/slices/workflowSlice.ts`
+- `src/store/slices/authSlice.ts`
+- `src/store/index.ts`
+
+3. Workflow domain logic
+- `src/data/workflow-logic/`
+- `src/data/workflowLogic.ts`
+- `workflow.definition.json`
+
+4. Mock API and data contracts
+- `src/data/api/`
+- `src/data/mockData.ts` (types/interfaces)
+- `public/mockData.json` (seed data)
+
+5. Main product pages
+- `src/pages/Tasks.tsx`
+- `src/pages/Designer.tsx`
+- `src/pages/SavedTasks.tsx`
+- `src/pages/Instances.tsx`
+- `src/pages/Admin.tsx`
+
+6. Designer internals
+- `src/components/designer/`
+- `src/pages/tasks/` (form, inbox, palette, timeline)
+
+7. Tests (behavior expectations)
+- `src/test/`
+
 ## Milestones (From First Commit, Grouped by 2 Commits)
 
 ### Checkpoint 01
