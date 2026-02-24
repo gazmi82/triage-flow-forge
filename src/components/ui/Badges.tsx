@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import type { Role } from "@/data/mockData";
+import type { Role, TriageColor } from "@/data/mockData";
 import { ROLE_LABELS, ROLE_COLORS } from "@/data/constants";
 
 interface RoleBadgeProps {
@@ -77,6 +77,39 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
         </span>
       )}
       {status}
+    </span>
+  );
+}
+
+const TRIAGE_COLORS: Record<TriageColor, string> = {
+  red: "bg-destructive/20 text-destructive border-destructive/40",
+  orange: "bg-warning/20 text-warning border-warning/40",
+  yellow: "bg-amber-100 text-amber-800 border-amber-300",
+  green: "bg-success/15 text-success border-success/30",
+  blue: "bg-info/15 text-info border-info/30",
+};
+
+const TRIAGE_LABELS: Record<TriageColor, string> = {
+  red: "Immediate",
+  orange: "Very urgent",
+  yellow: "Urgent",
+  green: "Standard",
+  blue: "Non-urgent",
+};
+
+interface TriageBadgeProps {
+  triageColor: TriageColor;
+  className?: string;
+}
+
+export function TriageBadge({ triageColor, className }: TriageBadgeProps) {
+  return (
+    <span className={cn(
+      "inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold uppercase tracking-wide",
+      TRIAGE_COLORS[triageColor],
+      className
+    )}>
+      {TRIAGE_LABELS[triageColor]}
     </span>
   );
 }

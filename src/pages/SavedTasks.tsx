@@ -19,6 +19,7 @@ type SortDirection = "asc" | "desc";
 type ViewMode = "table" | "cards";
 type ProcessStatus = "all" | "open" | "closed";
 const isGeneratedPatientName = (name: string) => /^generated from task console$/i.test(name.trim());
+const getEffectiveProcessStatus = (task: { status: string }) => (task.status === "completed" ? "closed" : "open");
 
 export default function SavedTasks() {
   const dispatch = useAppDispatch();
@@ -49,7 +50,7 @@ export default function SavedTasks() {
   const filtered = useMemo(() => {
     return [...visibleSavedTasks]
       .filter((task) => {
-        if (status !== "all" && task.processStatus !== status) return false;
+        if (status !== "all" && getEffectiveProcessStatus(task) !== status) return false;
         const q = query.trim().toLowerCase();
         if (!q) return true;
         return (
@@ -85,8 +86,8 @@ export default function SavedTasks() {
     return "Patient Name Pending";
   };
 
-  const openCount = visibleSavedTasks.filter((task) => task.processStatus === "open").length;
-  const closedCount = visibleSavedTasks.filter((task) => task.processStatus === "closed").length;
+  const closedCount = visibleSavedTasks.filter((task) => getEffectiveProcessStatus(task) === "closed").length;
+  const computedOpenCount = visibleSavedTasks.filter((task) => getEffectiveProcessStatus(task) === "open").length;
 
   return (
     <div className="h-full overflow-y-auto p-6">
@@ -104,7 +105,7 @@ export default function SavedTasks() {
         <TabsContent value="saved_tasks" className="space-y-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <Card><CardContent className="p-4"><p className="text-[11px] text-muted-foreground">Total</p><p className="text-2xl font-bold">{visibleSavedTasks.length}</p></CardContent></Card>
-            <Card><CardContent className="p-4"><p className="text-[11px] text-muted-foreground">Open</p><p className="text-2xl font-bold text-info">{openCount}</p></CardContent></Card>
+            <Card><CardContent className="p-4"><p className="text-[11px] text-muted-foreground">Open</p><p className="text-2xl font-bold text-info">{computedOpenCount}</p></CardContent></Card>
             <Card><CardContent className="p-4"><p className="text-[11px] text-muted-foreground">Closed</p><p className="text-2xl font-bold text-success">{closedCount}</p></CardContent></Card>
           </div>
 
@@ -170,7 +171,7 @@ export default function SavedTasks() {
                       <td className="px-3 py-2"><RoleBadge role={task.role} /></td>
                       <td className="px-3 py-2"><StatusBadge status={task.status} /></td>
                       <td className="px-3 py-2">
-                        <Badge variant={task.processStatus === "open" ? "secondary" : "outline"}>{task.processStatus}</Badge>
+                        <Badge variant={getEffectiveProcessStatus(task) === "open" ? "secondary" : "outline"}>{getEffectiveProcessStatus(task)}</Badge>
                       </td>
                       <td className="px-3 py-2">{formatTime(task.createdAt)}</td>
                       <td className="px-3 py-2">{formatTime(task.updatedAt ?? task.createdAt)}</td>
@@ -197,7 +198,7 @@ export default function SavedTasks() {
                     <p>{getPatientDisplayName(task)} · {task.patientId}</p>
                     <p className="text-muted-foreground">created_at: {formatTime(task.createdAt)}</p>
                     <p className="text-muted-foreground">updated_at: {formatTime(task.updatedAt ?? task.createdAt)}</p>
-                    <Badge variant={task.processStatus === "open" ? "secondary" : "outline"}>{task.processStatus}</Badge>
+                    <Badge variant={getEffectiveProcessStatus(task) === "open" ? "secondary" : "outline"}>{getEffectiveProcessStatus(task)}</Badge>
                     <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => redirectTaskProcess(task.id)}>
                       Redirect to Process
                     </Button>

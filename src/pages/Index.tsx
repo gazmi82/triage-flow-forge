@@ -1,8 +1,8 @@
-import { StatusBadge, PriorityBadge, RoleBadge } from "@/components/ui/Badges";
-import { slaBg } from "@/lib/formatters";
+import { StatusBadge, PriorityBadge, RoleBadge, TriageBadge } from "@/components/ui/Badges";
+import { minutesUntilDue, slaBg } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { bootstrapWorkflowThunk } from "@/store/slices/workflowSlice";
 import {
@@ -33,11 +33,12 @@ export default function Index() {
   const definitions = useAppSelector((state) => state.workflow.definitions);
   const hasBootstrapped = useAppSelector((state) => state.workflow.hasBootstrapped);
   const isLoading = useAppSelector((state) => state.workflow.isLoading);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const activeTasks = tasks.filter((t) => t.status !== "completed");
-  const overdueTasks = tasks.filter((t) => t.minutesRemaining < 0);
+  const overdueTasks = tasks.filter((t) => minutesUntilDue(t.dueAt, nowMs) < 0);
   const activeInstances = instances.filter((i) => i.status === "active");
   const urgentTasks = [...activeTasks]
-    .sort((a, b) => a.minutesRemaining - b.minutesRemaining)
+    .sort((a, b) => minutesUntilDue(a.dueAt, nowMs) - minutesUntilDue(b.dueAt, nowMs))
     .slice(0, 5);
 
   useEffect(() => {
@@ -45,6 +46,11 @@ export default function Index() {
       dispatch(bootstrapWorkflowThunk());
     }
   }, [dispatch, hasBootstrapped, isLoading]);
+
+  useEffect(() => {
+    const interval = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(interval);
+  }, []);
 
   return (
     <div className="h-full overflow-y-auto p-6 space-y-6">
@@ -77,7 +83,9 @@ export default function Index() {
             <button onClick={() => navigate("/tasks")} className="ml-auto text-[10px] text-accent hover:underline font-medium">View all →</button>
           </div>
           <div className="divide-y divide-border">
-            {urgentTasks.map((task) => (
+            {urgentTasks.map((task) => {
+              const remaining = minutesUntilDue(task.dueAt, nowMs);
+              return (
               <button
                 key={task.id}
                 onClick={() => navigate("/tasks")}
@@ -85,18 +93,20 @@ export default function Index() {
               >
                 <div className="flex items-center justify-between mb-1">
                   <p className="text-xs font-semibold">{task.name}</p>
-                  <span className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold", slaBg(task.minutesRemaining))}>
+                  <span className={cn("inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold", slaBg(remaining))}>
                     <Clock className="h-2.5 w-2.5" />
-                    {task.minutesRemaining < 0 ? `${Math.abs(task.minutesRemaining)}m overdue` : `${task.minutesRemaining}m left`}
+                    {remaining < 0 ? `${Math.abs(remaining)}m overdue` : `${remaining}m left`}
                   </span>
                 </div>
                 <p className="text-[10px] text-muted-foreground mb-1.5">{task.patientName} · {task.definitionName}</p>
                 <div className="flex gap-1.5 flex-wrap">
                   <PriorityBadge priority={task.priority} />
+                  {task.triageColor ? <TriageBadge triageColor={task.triageColor} /> : null}
                   <RoleBadge role={task.role} />
                 </div>
               </button>
-            ))}
+              );
+            })}
           </div>
         </div>
 

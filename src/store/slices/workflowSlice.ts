@@ -69,6 +69,7 @@ const initialState: WorkflowState = {
 type BootstrapPayload = Awaited<ReturnType<typeof mockApi.fetchBootstrapData>>;
 type ClaimTaskPayload = Awaited<ReturnType<typeof mockApi.claimTask>>;
 type CompleteTaskPayload = Awaited<ReturnType<typeof mockApi.completeTask>>;
+type SaveTaskEditsPayload = Awaited<ReturnType<typeof mockApi.saveTaskEdits>>;
 type CreateTaskFromConsoleResult = Awaited<ReturnType<typeof mockApi.createTaskFromConsole>>;
 type SaveDraftPayload = Awaited<ReturnType<typeof mockApi.saveDraft>>;
 type PublishDesignerPayload = Awaited<ReturnType<typeof mockApi.publishDesignerGraph>>;
@@ -102,6 +103,28 @@ export const completeTaskThunk = createAsyncThunk<
     return await mockApi.completeTask(payload.taskId, payload.actor, payload.patientName, payload.patientId);
   }
 );
+
+export const saveTaskEditsThunk = createAsyncThunk<
+  SaveTaskEditsPayload,
+  {
+    taskId: string;
+    actor: string;
+    formValues: Record<string, string | boolean>;
+    triageColor?: Task["triageColor"];
+    label?: string;
+    patientName?: string;
+    patientId?: string;
+  }
+>("workflow/saveTaskEdits", async (payload) => {
+  return await mockApi.saveTaskEdits(payload.taskId, {
+    actor: payload.actor,
+    formValues: payload.formValues,
+    triageColor: payload.triageColor,
+    label: payload.label,
+    patientName: payload.patientName,
+    patientId: payload.patientId,
+  });
+});
 
 export const createTaskFromConsoleThunk = createAsyncThunk(
   "workflow/createTaskFromConsole",
@@ -243,6 +266,14 @@ const workflowSlice = createSlice({
         state.designerNodes = toDesignerNodes(action.payload.graph.nodes);
         state.designerEdges = toDesignerEdges(action.payload.graph.edges);
         state.instances = action.payload.instances;
+      })
+      .addCase(saveTaskEditsThunk.fulfilled, (state, action) => {
+        state.tasks = action.payload.tasks;
+        state.savedTasks = action.payload.savedTasks;
+        state.designerNodes = toDesignerNodes(action.payload.graph.nodes);
+        state.designerEdges = toDesignerEdges(action.payload.graph.edges);
+        state.instances = action.payload.instances;
+        state.audit = action.payload.audit;
       })
       .addCase(createTaskFromConsoleThunk.fulfilled, (state, action) => {
         state.tasks = action.payload.tasks;

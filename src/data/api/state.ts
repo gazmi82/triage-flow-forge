@@ -18,7 +18,11 @@ import {
   getFormFieldsForUserTask,
   getOrderedUserTaskNodes,
   roleLabelToKey,
+  triageColorToCategory,
+  triageColorToPriority,
+  triageColorToSlaMinutes,
 } from "@/data/workflowLogic";
+import type { TriageColor } from "@/data/mockData";
 
 export const sleep = (ms = 120) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -74,6 +78,9 @@ export const ensureInitialized = async () => {
 };
 
 export const syncEmergencyTriageTasksFromDesigner = () => {
+  const isTriageColor = (value: unknown): value is TriageColor =>
+    value === "red" || value === "orange" || value === "yellow" || value === "green" || value === "blue";
+
   const userTaskNodes = getOrderedUserTaskNodes(mockStore.designerGraph);
   const byInstance = new Map<string, typeof userTaskNodes>();
   userTaskNodes.forEach((node) => {
@@ -89,12 +96,14 @@ export const syncEmergencyTriageTasksFromDesigner = () => {
   byInstance.forEach((nodes, instanceId) => {
     nodes.forEach((node, index) => {
       const now = Date.now();
-      const due = new Date(now + (index + 1) * 15 * 60 * 1000).toISOString();
       const role = roleLabelToKey(node.data.role);
       const statusFromNode = node.data.taskStatus;
       const status = statusFromNode === "completed" || statusFromNode === "claimed" || statusFromNode === "pending"
         ? statusFromNode
         : "pending";
+      const triageColor = isTriageColor(node.data.triageColor) ? node.data.triageColor : "yellow";
+      const slaMinutes = triageColorToSlaMinutes(triageColor);
+      const due = new Date(now + slaMinutes * 60 * 1000).toISOString();
 
       generatedEmergencyTasks.push({
         id: `t-${node.id}`,
@@ -105,14 +114,16 @@ export const syncEmergencyTriageTasksFromDesigner = () => {
         assignee: null,
         role,
         status,
-        priority: index === 0 ? "high" : "medium",
+        priority: triageColorToPriority(triageColor),
         createdAt: new Date(now).toISOString(),
         dueAt: due,
-        slaMinutes: 30,
-        minutesRemaining: 30 - index * 2,
+        slaMinutes,
+        minutesRemaining: slaMinutes,
         patientName: "Generated from Designer",
         patientId: `P-DES-${String(index + 1).padStart(3, "0")}`,
         formFields: getFormFieldsForUserTask(node.data.label ?? "User Task", role),
+        triageCategory: triageColorToCategory(triageColor),
+        triageColor,
       });
     });
   });

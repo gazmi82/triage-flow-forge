@@ -1,20 +1,34 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AlertTriangle, ChevronsUpDown, Circle, Clock, Diamond, Mail, Square } from "lucide-react";
 import { ROLE_LABELS } from "@/data/constants";
-import type { Role } from "@/data/mockData";
-import { Button, Label } from "@/components/ui";
+import type { Role, TriageColor } from "@/data/mockData";
+import { Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui";
 import { cn } from "@/lib";
-import type { TaskNodeType } from "@/pages/tasks/types";
+import { getDefaultNodeLabel, type TaskNodeType } from "@/pages/tasks/types";
 
 interface NodeTypePaletteProps {
   selected: TaskNodeType;
   onSelect: (value: TaskNodeType) => void;
-  onCreate: () => void;
+  onConfigChange: (payload: { nodeType: TaskNodeType; label: string; triageColor: TriageColor }) => void;
   currentRole: Role;
 }
 
-export function NodeTypePalette({ selected, onSelect, onCreate, currentRole }: NodeTypePaletteProps) {
+export function NodeTypePalette({ selected, onSelect, onConfigChange, currentRole }: NodeTypePaletteProps) {
   const [open, setOpen] = useState(true);
+  const [taskLabel, setTaskLabel] = useState(getDefaultNodeLabel(selected));
+  const [triageColor, setTriageColor] = useState<TriageColor>("yellow");
+
+  useEffect(() => {
+    setTaskLabel(getDefaultNodeLabel(selected));
+  }, [selected]);
+
+  useEffect(() => {
+    onConfigChange({
+      nodeType: selected,
+      label: taskLabel.trim() || getDefaultNodeLabel(selected),
+      triageColor,
+    });
+  }, [onConfigChange, selected, taskLabel, triageColor]);
 
   const buttonClass = (value: TaskNodeType, tint: string) =>
     cn(
@@ -61,15 +75,37 @@ export function NodeTypePalette({ selected, onSelect, onCreate, currentRole }: N
           </div>
 
           <div className="space-y-1.5">
+            <Label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Task Label</Label>
+            <Input
+              className="h-8 text-xs"
+              value={taskLabel}
+              onChange={(event) => setTaskLabel(event.target.value)}
+              placeholder="e.g. Cardiac Arrest - Bay 2"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Emergency Status</Label>
+            <Select value={triageColor} onValueChange={(value) => setTriageColor(value as TriageColor)}>
+              <SelectTrigger className="h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="red">Immediate (red)</SelectItem>
+                <SelectItem value="orange">Very urgent (orange)</SelectItem>
+                <SelectItem value="yellow">Urgent (yellow)</SelectItem>
+                <SelectItem value="green">Standard (green)</SelectItem>
+                <SelectItem value="blue">Non-urgent (blue)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
             <Label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Assigned Role</Label>
             <div className="flex h-8 items-center rounded-md border border-border bg-muted/40 px-2.5 text-xs font-medium">
               {ROLE_LABELS[currentRole]}
             </div>
           </div>
-
-          <Button size="sm" className="h-8 w-full text-xs" onClick={onCreate}>
-            Create Task
-          </Button>
         </div>
       )}
     </div>

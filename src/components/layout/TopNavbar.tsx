@@ -17,6 +17,7 @@ import {
   Bell,
   CircleUserRound,
   LogOut,
+  Plus,
   Settings,
   UserRound,
 } from "lucide-react";
@@ -40,6 +41,7 @@ export function TopNavbar() {
 
   const title = getRouteTitle(location.pathname);
   const isAdmin = isAdminRole(user?.role);
+  const isTaskConsole = location.pathname === "/tasks";
 
   const showNotImplemented = (label: string) => {
     toast({
@@ -58,6 +60,17 @@ export function TopNavbar() {
       </div>
 
       <div className="flex items-center gap-4">
+        {isTaskConsole && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 gap-1.5 text-xs"
+            onClick={() => window.dispatchEvent(new Event("task-console:create"))}
+          >
+            <Plus className="h-3.5 w-3.5" />
+            Create
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="icon"

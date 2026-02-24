@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Activity, CheckCircle2, Clock, User } from "lucide-react";
 import { ROLE_LABELS } from "@/data/constants";
-import { type Role, type Task } from "@/data/mockData";
+import { type Role, type Task, type TriageColor } from "@/data/mockData";
 import { useToast, useAuth } from "@/hooks";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {
@@ -11,15 +11,22 @@ import {
   completeTaskThunk,
   createTaskFromConsoleThunk,
   openTaskDesignerThunk,
-  saveDraftThunk,
+  saveTaskEditsThunk,
 } from "@/store/slices";
-import { Button, PriorityBadge, StatusBadge } from "@/components/ui";
-import { cn, slaBg, timeAgo } from "@/lib";
+import { Button, PriorityBadge, StatusBadge, TriageBadge } from "@/components/ui";
+import { cn, formatSlaCountdown, minutesUntilDue, secondsUntilDue, slaBg, timeAgo } from "@/lib";
 import { AuditTimeline } from "@/pages/tasks/AuditTimeline";
 import { TaskForm } from "@/pages/tasks/TaskForm";
 import { TaskInbox } from "@/pages/tasks/TaskInbox";
 import { NodeTypePalette } from "@/pages/tasks/NodeTypePalette";
 import { getDefaultNodeLabel, type TaskNodeType } from "@/pages/tasks/types";
+
+const getDisplayPatientName = (value: string) => {
+  if (/^generated from designer$/i.test(value.trim())) {
+    return "Patient Name Pending";
+  }
+  return value;
+};
 
 export default function Tasks() {
   const dispatch = useAppDispatch();
@@ -37,6 +44,11 @@ export default function Tasks() {
   const [search, setSearch] = useState("");
   const [showTimeline, setShowTimeline] = useState(false);
   const [selectedNodeType, setSelectedNodeType] = useState<TaskNodeType>("userTask");
+  const [createConfig, setCreateConfig] = useState<{ label: string; triageColor: TriageColor }>({
+    label: getDefaultNodeLabel("userTask"),
+    triageColor: "yellow",
+  });
+  const [nowMs, setNowMs] = useState(() => Date.now());
 
   const currentRole = user?.role ?? "triage_nurse";
   const visibleTasks = useMemo(() => {
@@ -63,7 +75,15 @@ export default function Tasks() {
     [search, visibleTasks]
   );
 
-  const selectedTask = filtered.find((task) => task.id === selectedTaskId) ?? null;
+  const selectedTask = visibleTasks.find((task) => task.id === selectedTaskId) ?? null;
+
+  useEffect(() => {
+    if (!selectedTask) return;
+    setCreateConfig({
+      label: selectedTask.name,
+      triageColor: selectedTask.triageColor ?? "yellow",
+    });
+  }, [selectedTask]);
 
   useEffect(() => {
     if (!hasBootstrapped && !isLoading) {
@@ -72,14 +92,15 @@ export default function Tasks() {
   }, [dispatch, hasBootstrapped, isLoading]);
 
   useEffect(() => {
-    if (!selectedTaskId && filtered.length > 0) {
-      setSelectedTaskId(filtered[0].id);
-      return;
+    const interval = window.setInterval(() => setNowMs(Date.now()), 1000);
+    return () => window.clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    if (selectedTaskId && !visibleTasks.some((task) => task.id === selectedTaskId)) {
+      setSelectedTaskId(null);
     }
-    if (selectedTaskId && !filtered.some((task) => task.id === selectedTaskId)) {
-      setSelectedTaskId(filtered[0]?.id ?? null);
-    }
-  }, [filtered, selectedTaskId]);
+  }, [selectedTaskId, visibleTasks]);
 
   const completeTask = async (payload: {
     redirectRole: Role;
@@ -90,6 +111,7 @@ export default function Tasks() {
     patientId?: string;
     conditionExpression?: string;
     correlationKey?: string;
+    triageColor?: TriageColor;
   }) => {
     if (!selectedTask) return;
 
@@ -113,9 +135,11 @@ export default function Tasks() {
         conditionExpression: payload.conditionExpression,
         correlationKey: payload.correlationKey,
         assignedRole: payload.redirectRole,
+        triageColor: completedTask.triageColor ?? payload.triageColor ?? "yellow",
         createdByRole: user?.role ?? "triage_nurse",
         patientName: payload.patientName ?? completedTask.patientName,
         patientId: payload.patientId ?? completedTask.patientId,
+        formValues: completedTask.formValues ?? {},
         registrationNote: `Auto-generated after completing ${completedTask.name}`,
       })
     );
@@ -130,9 +154,11 @@ export default function Tasks() {
           nodeType: "userTask",
           label: `${ROLE_LABELS[payload.branchARole]} Task`,
           assignedRole: payload.branchARole,
+          triageColor: completedTask.triageColor ?? payload.triageColor ?? "yellow",
           createdByRole: user?.role ?? "triage_nurse",
           patientName: payload.patientName ?? completedTask.patientName,
           patientId: payload.patientId ?? completedTask.patientId,
+          formValues: completedTask.formValues ?? {},
           registrationNote: "Auto-generated after andGateway branch A",
         })
       );
@@ -143,9 +169,11 @@ export default function Tasks() {
           nodeType: "userTask",
           label: `${ROLE_LABELS[payload.branchBRole]} Task`,
           assignedRole: payload.branchBRole,
+          triageColor: completedTask.triageColor ?? payload.triageColor ?? "yellow",
           createdByRole: user?.role ?? "triage_nurse",
           patientName: payload.patientName ?? completedTask.patientName,
           patientId: payload.patientId ?? completedTask.patientId,
+          formValues: completedTask.formValues ?? {},
           registrationNote: "Auto-generated after andGateway branch B",
         })
       );
@@ -173,9 +201,11 @@ export default function Tasks() {
           label: `${ROLE_LABELS[selectedRole]} Task`,
           conditionExpression: selectedCondition,
           assignedRole: selectedRole,
+          triageColor: completedTask.triageColor ?? payload.triageColor ?? "yellow",
           createdByRole: user?.role ?? "triage_nurse",
           patientName: payload.patientName ?? completedTask.patientName,
           patientId: payload.patientId ?? completedTask.patientId,
+          formValues: completedTask.formValues ?? {},
           registrationNote: `Auto-generated after xorGateway (${selectedCondition})`,
         })
       );
@@ -187,9 +217,11 @@ export default function Tasks() {
           nodeType: "userTask",
           label: `${ROLE_LABELS[payload.redirectRole]} Task`,
           assignedRole: payload.redirectRole,
+          triageColor: completedTask.triageColor ?? payload.triageColor ?? "yellow",
           createdByRole: user?.role ?? "triage_nurse",
           patientName: payload.patientName ?? completedTask.patientName,
           patientId: payload.patientId ?? completedTask.patientId,
+          formValues: completedTask.formValues ?? {},
           registrationNote: `Auto-generated after ${selectedNodeType}`,
         })
       );
@@ -206,24 +238,43 @@ export default function Tasks() {
               }.`
           : `Redirected to ${ROLE_LABELS[payload.redirectRole]}.`,
     });
+    const nextTask = createNodeResult.payload.tasks.find((task) => task.nodeId === createNodeResult.payload.createdNodeId);
+    setSelectedTaskId(nextTask?.id ?? null);
     setShowTimeline(false);
   };
 
-  const saveDraft = async () => {
-    await dispatch(saveDraftThunk());
+  const saveTask = async (payload: {
+    formValues: Record<string, string | boolean>;
+    triageColor?: TriageColor;
+    patientName?: string;
+    patientId?: string;
+  }) => {
+    if (!selectedTask) return;
+    await dispatch(
+      saveTaskEditsThunk({
+        taskId: selectedTask.id,
+        actor: user?.name ?? "System",
+        formValues: payload.formValues,
+        triageColor: createConfig.triageColor,
+        label: createConfig.label.trim() || selectedTask.name,
+        patientName: payload.patientName,
+        patientId: payload.patientId,
+      })
+    );
   };
 
   const claimTask = async (task: Task) => {
     await dispatch(claimTaskThunk({ taskId: task.id, assigneeName: user?.name ?? "Unassigned" }));
   };
 
-  const createTask = async () => {
+  const createTask = useCallback(async (payload: { nodeType: TaskNodeType; label: string; triageColor: TriageColor }) => {
     const created = await dispatch(
       createTaskFromConsoleThunk({
         fromNodeId: null,
         instanceId: null,
-        nodeType: "userTask",
-        label: getDefaultNodeLabel("userTask"),
+        nodeType: payload.nodeType,
+        label: payload.label.trim() || getDefaultNodeLabel(payload.nodeType),
+        triageColor: payload.triageColor,
         assignedRole: currentRole,
         createdByRole: user?.role ?? "triage_nurse",
         patientName: "Generated from Task Console",
@@ -237,12 +288,28 @@ export default function Tasks() {
     if (createdTask) {
       setSelectedTaskId(createdTask.id);
     }
-  };
+  }, [currentRole, dispatch, user?.role]);
+
+  useEffect(() => {
+    const handleCreateFromTopBar = () => {
+      void createTask({
+        nodeType: selectedNodeType,
+        label: createConfig.label,
+        triageColor: createConfig.triageColor,
+      });
+    };
+
+    window.addEventListener("task-console:create", handleCreateFromTopBar);
+    return () => window.removeEventListener("task-console:create", handleCreateFromTopBar);
+  }, [createConfig.label, createConfig.triageColor, createTask, selectedNodeType]);
 
   const openTaskProcessDesign = async (taskId: string) => {
     await dispatch(openTaskDesignerThunk({ taskId }));
     navigate("/designer");
   };
+
+  const liveMinutesRemaining = selectedTask ? minutesUntilDue(selectedTask.dueAt, nowMs) : 0;
+  const liveSecondsRemaining = selectedTask ? secondsUntilDue(selectedTask.dueAt, nowMs) : 0;
 
   return (
     <div className="flex h-full flex-col md:flex-row">
@@ -261,7 +328,10 @@ export default function Tasks() {
         <NodeTypePalette
           selected={selectedNodeType}
           onSelect={setSelectedNodeType}
-          onCreate={createTask}
+          onConfigChange={(payload) => {
+            setSelectedNodeType(payload.nodeType);
+            setCreateConfig({ label: payload.label, triageColor: payload.triageColor });
+          }}
           currentRole={currentRole}
         />
       </div>
@@ -275,9 +345,10 @@ export default function Tasks() {
                   <h1 className="text-base font-bold">{selectedTask.name}</h1>
                   <PriorityBadge priority={selectedTask.priority} />
                   <StatusBadge status={selectedTask.status} />
+                  {selectedTask.triageColor ? <TriageBadge triageColor={selectedTask.triageColor} /> : null}
                 </div>
                 <p className="text-xs text-muted-foreground">
-                  {selectedTask.definitionName} · Instance {selectedTask.instanceId} · Patient: <strong>{selectedTask.patientName}</strong> ({selectedTask.patientId})
+                  {selectedTask.definitionName} · Instance {selectedTask.instanceId} · Patient: <strong>{getDisplayPatientName(selectedTask.patientName)}</strong> ({selectedTask.patientId})
                 </p>
               </div>
 
@@ -295,11 +366,11 @@ export default function Tasks() {
               </div>
             </div>
 
-            <div className={cn("mt-3 flex items-center gap-2 rounded-md border px-3 py-2 text-xs", slaBg(selectedTask.minutesRemaining))}>
+            <div className={cn("mt-3 flex items-center gap-2 rounded-md border px-3 py-2 text-xs", slaBg(liveMinutesRemaining))}>
               <Clock className="h-3.5 w-3.5 flex-shrink-0" />
-              {selectedTask.minutesRemaining < 0
-                ? `⚠ SLA breached — ${Math.abs(selectedTask.minutesRemaining)} minutes overdue`
-                : `SLA: ${selectedTask.minutesRemaining} minutes remaining (due ${timeAgo(selectedTask.dueAt)})`}
+              {liveMinutesRemaining < 0
+                ? `⚠ SLA breached — ${formatSlaCountdown(liveSecondsRemaining)}`
+                : `SLA: ${formatSlaCountdown(liveSecondsRemaining)} (due ${timeAgo(selectedTask.dueAt)})`}
             </div>
           </div>
 
@@ -311,7 +382,7 @@ export default function Tasks() {
                   task={selectedTask}
                   selectedNodeType={selectedNodeType}
                   onComplete={completeTask}
-                  onSaveDraft={saveDraft}
+                  onSave={saveTask}
                 />
               </div>
             </div>
@@ -331,7 +402,7 @@ export default function Tasks() {
               <CheckCircle2 className="h-5 w-5 text-success" />
               <p className="text-base font-semibold">No task selected</p>
             </div>
-            <p className="text-sm text-muted-foreground">Create tasks from the shape/type accordion in the left panel.</p>
+            <p className="text-sm text-muted-foreground">Use Create in the top bar to start a task when the board is empty.</p>
           </div>
           <div className="flex-1" />
         </div>

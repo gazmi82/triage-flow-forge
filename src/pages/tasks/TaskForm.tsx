@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ChevronsUpDown, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks";
 import { ROLE_LABELS } from "@/data/constants";
-import type { Role, Task } from "@/data/mockData";
+import type { Role, Task, TriageColor } from "@/data/mockData";
 import type { TaskNodeType } from "@/pages/tasks/types";
 import {
   buildRequiredFieldErrors,
@@ -35,13 +35,20 @@ interface TaskFormProps {
     patientId?: string;
     conditionExpression?: string;
     correlationKey?: string;
+    triageColor?: TriageColor;
   }) => Promise<void> | void;
-  onSaveDraft: () => void;
+  onSave: (payload: {
+    formValues: Record<string, string | boolean>;
+    triageColor?: TriageColor;
+    patientName?: string;
+    patientId?: string;
+  }) => Promise<void> | void;
 }
 
-export function TaskForm({ task, selectedNodeType, onComplete, onSaveDraft }: TaskFormProps) {
+export function TaskForm({ task, selectedNodeType, onComplete, onSave }: TaskFormProps) {
   const { toast } = useToast();
-  const [values, setValues] = useState<Record<string, string | boolean>>({});
+  const [values, setValues] = useState<Record<string, string | boolean>>(task.formValues ?? {});
+  const [lastSavedValues, setLastSavedValues] = useState<Record<string, string | boolean>>(task.formValues ?? {});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [redirectRole, setRedirectRole] = useState<Role | "">("");
   const [showRedirectAccordion, setShowRedirectAccordion] = useState(true);
@@ -50,8 +57,26 @@ export function TaskForm({ task, selectedNodeType, onComplete, onSaveDraft }: Ta
   const [branchBRole, setBranchBRole] = useState<Role | "">("");
   const [xorSelectedCondition, setXorSelectedCondition] = useState<"critical" | "non_critical" | "">("");
 
+  const triageColorToStatusLabel = (triageColor?: TriageColor): string | undefined => {
+    if (triageColor === "red") return "Immediate";
+    if (triageColor === "orange") return "Very urgent";
+    if (triageColor === "yellow") return "Urgent";
+    if (triageColor === "green") return "Standard";
+    if (triageColor === "blue") return "Non-urgent";
+    return undefined;
+  };
+
   const resetForm = useCallback(() => {
-    setValues({});
+    const seededValues: Record<string, string | boolean> = { ...(task.formValues ?? {}) };
+    const triageLabel = triageColorToStatusLabel(task.triageColor);
+    if (triageLabel && typeof seededValues.urgency !== "string") {
+      seededValues.urgency = triageLabel;
+    }
+    if (triageLabel && typeof seededValues.severity !== "string") {
+      seededValues.severity = triageLabel;
+    }
+    setValues(seededValues);
+    setLastSavedValues(seededValues);
     setErrors({});
     setRedirectRole("");
     setShowRedirectAccordion(true);
@@ -59,11 +84,13 @@ export function TaskForm({ task, selectedNodeType, onComplete, onSaveDraft }: Ta
     setBranchARole("");
     setBranchBRole("");
     setXorSelectedCondition("");
-  }, []);
+  }, [task.formValues, task.triageColor]);
 
   useEffect(() => {
     resetForm();
   }, [resetForm, task.id, task.status, task.updatedAt]);
+
+  const isDirty = JSON.stringify(values) !== JSON.stringify(lastSavedValues);
 
   const setFieldValue = (fieldId: string, value: string | boolean) => {
     setValues((prev) => ({ ...prev, [fieldId]: value }));
@@ -85,6 +112,52 @@ export function TaskForm({ task, selectedNodeType, onComplete, onSaveDraft }: Ta
     return typeof value === "string" ? value : "";
   };
 
+  const redirectRoleFromValues = getStringValue("redirect_role") as Role | "";
+  const branchARoleFromValues = getStringValue("branch_a_role") as Role | "";
+  const branchBRoleFromValues = getStringValue("branch_b_role") as Role | "";
+  const xorConditionFromValues = getStringValue("xor_active_condition") as "critical" | "non_critical" | "";
+  const effectiveRedirectRole = redirectRole || redirectRoleFromValues;
+  const effectiveBranchARole = branchARole || branchARoleFromValues;
+  const effectiveBranchBRole = branchBRole || branchBRoleFromValues;
+  const effectiveXorCondition = xorSelectedCondition || xorConditionFromValues;
+
+  const inferTriageColorFromForm = (): TriageColor | undefined => {
+    const candidates = [
+      values.urgency,
+      values.severity,
+      values.triage_status,
+      values.triage,
+    ]
+      .filter((value): value is string => typeof value === "string")
+      .map((value) => value.trim().toLowerCase());
+
+    const match = candidates.find((value) => value.length > 0);
+    if (!match) return undefined;
+
+    if (match.includes("immediate") || match.includes("red") || match.includes("critical")) return "red";
+    if (match.includes("very urgent") || match.includes("orange")) return "orange";
+    if (match.includes("non-urgent") || match.includes("non urgent") || match.includes("blue")) return "blue";
+    if (match.includes("standard") || match.includes("standart") || match.includes("green")) return "green";
+    if (match.includes("urgent") || match.includes("yellow") || match.includes("high") || match.includes("medium")) return "yellow";
+    return undefined;
+  };
+
+  const buildSavePayload = () => ({
+    formValues: values,
+    triageColor: inferTriageColorFromForm(),
+    patientName: findFirstStringFieldValue(task.formFields, values, ["patient_name", "patientName"], ["patient name"]),
+    patientId: findFirstStringFieldValue(task.formFields, values, ["patient_id", "patientId"], ["patient id"]),
+  });
+
+  const handleSave = async () => {
+    await onSave(buildSavePayload());
+    setLastSavedValues(values);
+    toast({
+      title: "Saved",
+      description: "Task updates are now visible on the task card and header.",
+    });
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) {
@@ -96,7 +169,7 @@ export function TaskForm({ task, selectedNodeType, onComplete, onSaveDraft }: Ta
       return;
     }
     if (selectedNodeType === "andGateway") {
-      if (!branchARole || !branchBRole) {
+      if (!effectiveBranchARole || !effectiveBranchBRole) {
         toast({
           title: "AND roles required",
           description: "Assign a role for both Branch A and Branch B before completing the task.",
@@ -104,7 +177,7 @@ export function TaskForm({ task, selectedNodeType, onComplete, onSaveDraft }: Ta
         });
         return;
       }
-    } else if (selectedNodeType !== "xorGateway" && !redirectRole) {
+    } else if (selectedNodeType !== "xorGateway" && !effectiveRedirectRole) {
       toast({
         title: "Redirect role required",
         description: "Select the next role before completing the task.",
@@ -113,7 +186,7 @@ export function TaskForm({ task, selectedNodeType, onComplete, onSaveDraft }: Ta
       return;
     }
     if (selectedNodeType === "xorGateway") {
-      if (!branchARole || !branchBRole) {
+      if (!effectiveBranchARole || !effectiveBranchBRole) {
         toast({
           title: "XOR roles required",
           description: "Assign a role for Critical and Non Critical paths.",
@@ -121,7 +194,7 @@ export function TaskForm({ task, selectedNodeType, onComplete, onSaveDraft }: Ta
         });
         return;
       }
-      if (!xorSelectedCondition) {
+      if (!effectiveXorCondition) {
         toast({
           title: "Select active condition",
           description: "Choose whether this completion follows Condition A or Condition B.",
@@ -138,25 +211,34 @@ export function TaskForm({ task, selectedNodeType, onComplete, onSaveDraft }: Ta
       });
       return;
     }
+    if (isDirty) {
+      toast({
+        title: "Save required",
+        description: "Save changes before completing this task.",
+        variant: "destructive",
+      });
+      return;
+    }
     toast({ title: "Task completed", description: `"${task.name}" has been completed and the process advanced.` });
     await onComplete({
-      redirectRole: redirectRole || branchARole || task.role,
-      branchARole: selectedNodeType === "andGateway" ? (branchARole || undefined) : undefined,
-      branchBRole: selectedNodeType === "andGateway" ? (branchBRole || undefined) : undefined,
-      xorSelectedCondition: selectedNodeType === "xorGateway" ? (xorSelectedCondition || undefined) : undefined,
+      redirectRole: effectiveRedirectRole || effectiveBranchARole || task.role,
+      branchARole: selectedNodeType === "andGateway" ? (effectiveBranchARole || undefined) : undefined,
+      branchBRole: selectedNodeType === "andGateway" ? (effectiveBranchBRole || undefined) : undefined,
+      xorSelectedCondition: selectedNodeType === "xorGateway" ? (effectiveXorCondition || undefined) : undefined,
       ...(selectedNodeType === "xorGateway"
         ? {
-            branchARole: branchARole || undefined,
-            branchBRole: branchBRole || undefined,
+            branchARole: effectiveBranchARole || undefined,
+            branchBRole: effectiveBranchBRole || undefined,
           }
         : null),
-      patientName: findFirstStringFieldValue(task.formFields, values, ["patient_name", "patientName"], ["patient name"]),
-      patientId: findFirstStringFieldValue(task.formFields, values, ["patient_id", "patientId"], ["patient id"]),
+      patientName: buildSavePayload().patientName,
+      patientId: buildSavePayload().patientId,
       conditionExpression:
         selectedNodeType === "xorGateway"
           ? "critical | non_critical"
           : undefined,
       correlationKey: selectedNodeType === "messageEvent" ? correlationKey.trim() || undefined : undefined,
+      triageColor: inferTriageColorFromForm(),
     });
     resetForm();
   };
@@ -236,12 +318,21 @@ export function TaskForm({ task, selectedNodeType, onComplete, onSaveDraft }: Ta
 
       <GatewayConfigService
         selectedNodeType={selectedNodeType}
-        branchARole={branchARole}
-        branchBRole={branchBRole}
+        branchARole={effectiveBranchARole}
+        branchBRole={effectiveBranchBRole}
         xorSelectedCondition={xorSelectedCondition}
-        onBranchARoleChange={setBranchARole}
-        onBranchBRoleChange={setBranchBRole}
-        onXorSelectedConditionChange={setXorSelectedCondition}
+        onBranchARoleChange={(value) => {
+          setBranchARole(value);
+          if (value) setFieldValue("branch_a_role", value);
+        }}
+        onBranchBRoleChange={(value) => {
+          setBranchBRole(value);
+          if (value) setFieldValue("branch_b_role", value);
+        }}
+        onXorSelectedConditionChange={(value) => {
+          setXorSelectedCondition(value);
+          if (value) setFieldValue("xor_active_condition", value);
+        }}
       />
 
       <EventConfigService
@@ -267,7 +358,13 @@ export function TaskForm({ task, selectedNodeType, onComplete, onSaveDraft }: Ta
               Select next role
               <span className="ml-1 text-destructive">*</span>
             </Label>
-            <Select value={redirectRole || undefined} onValueChange={(value) => setRedirectRole(value as Role)}>
+            <Select
+              value={effectiveRedirectRole || undefined}
+              onValueChange={(value) => {
+                setRedirectRole(value as Role);
+                setFieldValue("redirect_role", value);
+              }}
+            >
               <SelectTrigger className="h-8 text-sm">
                 <SelectValue placeholder="Choose role..." />
               </SelectTrigger>
@@ -286,12 +383,12 @@ export function TaskForm({ task, selectedNodeType, onComplete, onSaveDraft }: Ta
       )}
 
       <div className="flex gap-2 pt-2">
+        <Button type="button" variant="outline" size="sm" onClick={handleSave}>
+          Save
+        </Button>
         <Button type="submit" size="sm" className="gap-1.5">
           <CheckCircle2 className="h-3.5 w-3.5" />
           Complete Task
-        </Button>
-        <Button type="button" variant="outline" size="sm" onClick={onSaveDraft}>
-          Save Draft
         </Button>
       </div>
     </form>

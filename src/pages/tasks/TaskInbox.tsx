@@ -1,8 +1,15 @@
 import { CheckCircle2, Search } from "lucide-react";
-import { Button, Input, PriorityBadge, RoleBadge, StatusBadge } from "@/components/ui";
+import { Button, Input, PriorityBadge, RoleBadge, StatusBadge, TriageBadge } from "@/components/ui";
 import { cn } from "@/lib";
 import type { Task } from "@/data/mockData";
 import { SlaTimer } from "@/pages/tasks/SlaTimer";
+
+const getDisplayPatientName = (value: string) => {
+  if (/^generated from designer$/i.test(value.trim())) {
+    return "Patient Name Pending";
+  }
+  return value;
+};
 
 interface TaskInboxProps {
   tasks: Task[];
@@ -47,28 +54,47 @@ export function TaskInbox({
       {tasks.map((task) => (
         <div
           key={task.id}
+          role="button"
+          tabIndex={0}
+          aria-label={task.name}
+          onClick={() => onSelectTask(task.id)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              onSelectTask(task.id);
+            }
+          }}
           className={cn(
-            "w-full px-4 py-3 transition-colors hover:bg-muted/60",
+            "w-full cursor-pointer px-4 py-3 transition-colors hover:bg-muted/60",
             selectedTaskId === task.id && "border-l-2 border-l-primary bg-primary/5"
           )}
         >
           <div className="mb-1.5 flex items-start justify-between gap-2">
-            <button onClick={() => onSelectTask(task.id)} className="flex-1 text-left">
+            <div className="flex-1 text-left">
               <p className="text-xs font-semibold leading-tight">{task.name}</p>
-            </button>
+            </div>
             <div className="flex items-center gap-2">
-              <SlaTimer minutesRemaining={task.minutesRemaining} />
-              <Button size="sm" variant="outline" className="h-6 px-2 text-[10px]" onClick={() => onOpenProcess(task.id)}>
+              <SlaTimer dueAt={task.dueAt} />
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-6 px-2 text-[10px]"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onOpenProcess(task.id);
+                }}
+              >
                 Process
               </Button>
             </div>
           </div>
           <p className="mb-1.5 text-[10px] text-muted-foreground">
-            {task.patientName} · {task.patientId}
+            {getDisplayPatientName(task.patientName)} · {task.patientId}
           </p>
           <div className="flex flex-wrap items-center gap-1.5">
             <StatusBadge status={task.status} />
             <PriorityBadge priority={task.priority} />
+            {task.triageColor ? <TriageBadge triageColor={task.triageColor} /> : null}
             <RoleBadge role={task.role} />
           </div>
         </div>

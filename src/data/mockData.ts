@@ -1,6 +1,7 @@
 export type Role = "reception" | "triage_nurse" | "physician" | "lab" | "radiology" | "admin";
 export type TaskStatus = "pending" | "claimed" | "completed" | "overdue";
 export type DesignerTaskStatus = "pending" | "claimed" | "completed";
+export type TriageColor = "red" | "orange" | "yellow" | "green" | "blue";
 export type BpmnNodeType =
   | "startEvent"
   | "endEvent"
@@ -81,7 +82,10 @@ export interface Task {
   patientName: string;
   patientId: string;
   formFields: FormField[];
+  formValues?: Record<string, string | boolean>;
   updatedAt?: string;
+  triageCategory?: "urgent" | "non_urgent";
+  triageColor?: TriageColor;
 }
 
 export interface SavedTaskRecord extends Task {
@@ -124,6 +128,7 @@ export interface DesignerGraphNodeData extends Record<string, unknown> {
   laneRef?: Exclude<Role, "admin">;
   conditionExpression?: string;
   correlationKey?: string;
+  triageColor?: TriageColor;
 }
 
 export interface DesignerGraphNode {
@@ -167,11 +172,13 @@ export interface CreateTaskFromConsolePayload {
   label: string;
   conditionExpression?: string;
   correlationKey?: string;
+  triageColor?: TriageColor;
   assignedRole: Role;
   createdByRole: Role;
   patientName?: string;
   patientId?: string;
   registrationNote?: string;
+  formValues?: Record<string, string | boolean>;
 }
 
 export interface MockDataSeed {

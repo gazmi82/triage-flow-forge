@@ -69,6 +69,28 @@
         "enabled": true,
         "scope": "all_supported_roles_except_admin"
       },
+      "urgencyStatusSelection": {
+        "enabled": true,
+        "type": "single_select",
+        "options": [
+          { "label": "Immediate", "triageColor": "red" },
+          { "label": "Very urgent", "triageColor": "orange" },
+          { "label": "Urgent", "triageColor": "yellow" },
+          { "label": "Standard", "triageColor": "green" },
+          { "label": "Non-urgent", "triageColor": "blue" }
+        ]
+      },
+      "slaPolicy": {
+        "source": "urgency_status",
+        "targetsMinutes": {
+          "red": 0,
+          "orange": 10,
+          "yellow": 60,
+          "green": 120,
+          "blue": 240
+        },
+        "resetTimerOnUrgencyChange": true
+      },
       "roleRules": {
         "reception": {
           "defaultShapeType": "userTask",
