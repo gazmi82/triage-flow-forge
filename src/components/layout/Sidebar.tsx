@@ -7,7 +7,6 @@ import {
   FileText,
   Archive,
   Users,
-  Component,
   Activity,
   BookOpen,
   ChevronRight,
@@ -28,7 +27,6 @@ const NAV_ITEMS: Array<{ to: AppNavRoute; icon: LucideIcon; label: string }> = [
   { to: "/saved-tasks", icon: Archive, label: "Saved Tasks" },
   { to: "/instances", icon: Activity, label: "Instances" },
   { to: "/admin", icon: Users, label: "Admin" },
-  { to: "/components", icon: Component, label: "Components" },
   { to: "/docs", icon: BookOpen, label: "Documentation" },
 ];
 

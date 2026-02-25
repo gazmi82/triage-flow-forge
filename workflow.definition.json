@@ -1,12 +1,12 @@
 {
   "schemaVersion": "1.4.0",
   "definition": {
-    "id": "def.emergency_triage.v6",
+    "id": "def1",
     "key": "emergency_triage",
     "name": "Emergency Triage",
-    "version": 6,
-    "status": "draft",
-    "description": "Task Console is the entry point. Process Designer is a read-only projection of task-created nodes. Admin includes user provisioning with role assignment.",
+    "version": 3,
+    "status": "published",
+    "description": "Task Console is the execution entry point. Process Designer is a read-only projection of task-created nodes. Admin includes user provisioning with role assignment.",
     "lanes": [
       "reception",
       "triage_nurse",
@@ -27,24 +27,24 @@
         {
           "role": "admin",
           "allow": [
-            "dashboard",
-            "process_designer",
-            "task_console",
-            "draft",
-            "saved_tasks",
-            "instance_monitor",
-            "admin",
-            "docs"
+            "/",
+            "/designer",
+            "/tasks",
+            "/draft",
+            "/saved-tasks",
+            "/instances",
+            "/admin",
+            "/docs"
           ]
         },
         {
           "role": "non_admin",
           "allow": [
-            "process_designer",
-            "task_console",
-            "draft",
-            "saved_tasks",
-            "docs"
+            "/designer",
+            "/tasks",
+            "/draft",
+            "/saved-tasks",
+            "/docs"
           ]
         }
       ]
@@ -69,17 +69,32 @@
       },
       "assignedRoleSelection": {
         "enabled": true,
-        "scope": "all_supported_roles_except_admin"
+        "scope": "all_supported_roles_including_admin"
       },
       "urgencyStatusSelection": {
         "enabled": true,
         "type": "single_select",
         "options": [
-          { "label": "Immediate", "triageColor": "red" },
-          { "label": "Very urgent", "triageColor": "orange" },
-          { "label": "Urgent", "triageColor": "yellow" },
-          { "label": "Standard", "triageColor": "green" },
-          { "label": "Non-urgent", "triageColor": "blue" }
+          {
+            "label": "Immediate",
+            "triageColor": "red"
+          },
+          {
+            "label": "Very urgent",
+            "triageColor": "orange"
+          },
+          {
+            "label": "Urgent",
+            "triageColor": "yellow"
+          },
+          {
+            "label": "Standard",
+            "triageColor": "green"
+          },
+          {
+            "label": "Non-urgent",
+            "triageColor": "blue"
+          }
         ]
       },
       "slaPolicy": {
@@ -141,7 +156,7 @@
   },
   "stateManagement": {
     "driver": "redux_toolkit",
-    "sourceOfTruth": "mockData_api",
+    "sourceOfTruth": "public/mockData.json",
     "syncRules": {
       "task_console_create_to_designer": "creating node/task in task console updates designer graph immediately",
       "task_console_claim_complete_to_designer": "task status changes mirror node taskStatus",
@@ -194,8 +209,8 @@
       },
       "eventRules": {
         "timerEvent": "creates_or_updates_sla_wait_state",
-        "messageEvent": "waits_for_external_payload_with_optional_correlation_key",
-        "signalEvent": "broadcast_style_transition_across_matching_instances_optional"
+        "messageEvent": "requires_correlation_key_then_transitions",
+        "signalEvent": "instance_scoped_transition_currently"
       }
     },
     "validationRules": {
@@ -223,7 +238,8 @@
       }
     },
     "serialization": {
-      "primary": "workflow.definition.json",
+      "primary": "public/mockData.json",
+      "contract": "workflow.definition.json",
       "runtimeGraph": "redux_workflow_state",
       "bpmnXmlImportExport": "planned_not_implemented"
     }
@@ -246,5 +262,40 @@
     "supportedEdgeTypes": [
       "sequenceFlow"
     ]
+  },
+  "persistencePlan": {
+    "postgres": {
+      "requiredTables": [
+        "users",
+        "credentials",
+        "roles",
+        "permissions",
+        "user_roles",
+        "role_permissions",
+        "process_definitions",
+        "process_instances",
+        "tasks",
+        "audit_events",
+        "drafts",
+        "saved_tasks"
+      ],
+      "notes": [
+        "Use process_definitions.key + version as unique constraint.",
+        "Use process_instances.id and tasks.id as immutable primary keys.",
+        "Model saved_tasks as denormalized history or SQL view from tasks + completion state."
+      ]
+    },
+    "redis": {
+      "recommendedKeys": [
+        "session:{userId}",
+        "task_queue:{role}",
+        "instance_active_set",
+        "sla_deadlines_zset"
+      ],
+      "notes": [
+        "Use Redis for session/cache/queue acceleration, not as system of record.",
+        "Keep authoritative writes in Postgres and invalidate/update Redis on mutations."
+      ]
+    }
   }
 }
