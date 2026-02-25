@@ -18,6 +18,7 @@ const Draft = lazy(() => import("./pages/Draft"));
 const SavedTasks = lazy(() => import("./pages/SavedTasks"));
 const Instances = lazy(() => import("./pages/Instances"));
 const Admin = lazy(() => import("./pages/Admin"));
+const Components = lazy(() => import("./pages/Components"));
 const Docs = lazy(() => import("./pages/Docs"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const Auth = lazy(() => import("./pages/Auth"));
@@ -59,6 +60,7 @@ function ProtectedApp() {
                   <Route path="/saved-tasks" element={<SavedTasks />} />
                   <Route path="/instances" element={<Instances />} />
                   <Route path="/admin" element={<Admin />} />
+                  <Route path="/components" element={<Components />} />
                   <Route path="/docs" element={<Docs />} />
                   <Route path="*" element={<NotFound />} />
                 </>
