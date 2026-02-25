@@ -2,11 +2,15 @@ package redis
 
 import (
 	"context"
+	"errors"
 	"strconv"
 	"sync"
+	"time"
 
 	goredis "github.com/redis/go-redis/v9"
 )
+
+var ErrKeyNotFound = errors.New("redis key not found")
 
 type Client struct {
 	addr     string
@@ -24,6 +28,28 @@ func NewClient(addr, password, db string) *Client {
 func (c *Client) Ping(ctx context.Context) error {
 	cli := c.ensureClient()
 	return cli.Ping(ctx).Err()
+}
+
+func (c *Client) SetString(ctx context.Context, key, value string, ttl time.Duration) error {
+	cli := c.ensureClient()
+	return cli.Set(ctx, key, value, ttl).Err()
+}
+
+func (c *Client) GetString(ctx context.Context, key string) (string, error) {
+	cli := c.ensureClient()
+	value, err := cli.Get(ctx, key).Result()
+	if errors.Is(err, goredis.Nil) {
+		return "", ErrKeyNotFound
+	}
+	if err != nil {
+		return "", err
+	}
+	return value, nil
+}
+
+func (c *Client) Delete(ctx context.Context, key string) error {
+	cli := c.ensureClient()
+	return cli.Del(ctx, key).Err()
 }
 
 func (c *Client) Close() error {

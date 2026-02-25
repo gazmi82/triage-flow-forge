@@ -42,6 +42,8 @@ func NewRouter(deps Dependencies) http.Handler {
 	mux.HandleFunc("/v1/metrics", srv.handleMetrics)
 	mux.HandleFunc("/api/workflow/bootstrap", srv.handleBootstrap)
 	mux.HandleFunc("/api/auth/login", srv.handleLogin)
+	mux.HandleFunc("/api/auth/session", srv.handleSession)
+	mux.HandleFunc("/api/auth/logout", srv.handleLogout)
 	mux.HandleFunc("/api/admin/users", srv.handleCreateUser)
 	mux.HandleFunc("/api/tasks", srv.handleTasks)
 	mux.HandleFunc("/api/tasks/create-from-console", srv.handleCreateTaskFromConsole)

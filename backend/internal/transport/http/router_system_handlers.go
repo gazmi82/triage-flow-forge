@@ -12,11 +12,24 @@ func (s *server) handleReady(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusServiceUnavailable, "postgres unavailable")
 		return
 	}
-	if err := s.deps.Redis.Ping(ctx); err != nil {
-		writeError(w, http.StatusServiceUnavailable, "redis unavailable")
-		return
+
+	response := map[string]any{
+		"status": "ready",
+		"dependencies": map[string]string{
+			"postgres": "up",
+			"redis":    "up",
+		},
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ready"})
+
+	if err := s.deps.Redis.Ping(ctx); err != nil {
+		response["status"] = "degraded"
+		response["dependencies"] = map[string]string{
+			"postgres": "up",
+			"redis":    "degraded",
+		}
+	}
+
+	writeJSON(w, http.StatusOK, response)
 }
 
 func (s *server) handleMetrics(w http.ResponseWriter, r *http.Request) {

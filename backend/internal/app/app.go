@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"time"
 
@@ -67,7 +68,7 @@ func (a *App) Run(ctx context.Context) error {
 		return err
 	}
 	if err := a.redis.Ping(ctx); err != nil {
-		return err
+		log.Printf("redis unavailable at startup, continuing in degraded mode: %v", err)
 	}
 
 	errCh := make(chan error, 1)
