@@ -88,3 +88,34 @@ If chat resets, review in this order:
 8. `src/test/`
 
 </details>
+
+<details>
+<summary><strong>9) Task Runtime Contract (Current)</strong></summary>
+
+- Canonical create endpoint: `POST /api/tasks/create-from-console`
+- Claim endpoint: `POST /api/tasks/{taskId}/claim`
+- Save endpoint: `PATCH /api/tasks/{taskId}` (backend also accepts `PUT/POST` for compatibility)
+- Complete endpoint: `POST /api/tasks/{taskId}/complete`
+
+Mutation response contract:
+- `tasks`
+- `savedTasks`
+- `graph`
+- `instances`
+- `audit`
+
+Create/save/complete behavior:
+- Create seeds default form fields (`patient_name`, `patient_id`, `notes`) for new user tasks.
+- Save updates form values, patient fields, triage/SLA-derived attributes, and saved snapshot projection.
+- Complete closes current task, appends audit, refreshes instance state, and can spawn downstream task(s).
+
+Frontend completion guard:
+- Complete blocked until at least one successful save in current task session.
+- Complete blocked if there are unsaved edits.
+- Routing-only temporary fields are stripped from forwarded form payload when spawning next tasks.
+
+Core implementation files:
+- Frontend: `src/pages/Tasks.tsx`, `src/pages/tasks/TaskForm.tsx`, `src/data/apiClient.ts`, `src/store/slices/workflowSlice.ts`
+- Backend: `backend/internal/transport/http/router.go`, `backend/internal/platform/db/postgres/task_creation.go`, `backend/internal/platform/db/postgres/tasks.go`
+
+</details>

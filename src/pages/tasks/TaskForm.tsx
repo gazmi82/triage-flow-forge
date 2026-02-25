@@ -47,8 +47,17 @@ interface TaskFormProps {
 
 export function TaskForm({ task, selectedNodeType, onComplete, onSave }: TaskFormProps) {
   const { toast } = useToast();
+
+  const effectiveFormFields: Task["formFields"] =
+    task.formFields.length > 0
+      ? task.formFields
+      : [
+          { id: "patient_name", label: "Patient Name", type: "text", required: true },
+          { id: "patient_id", label: "Patient ID", type: "text", required: true },
+          { id: "notes", label: "Notes", type: "textarea", required: false },
+        ];
+
   const [values, setValues] = useState<Record<string, string | boolean>>(task.formValues ?? {});
-  const [lastSavedValues, setLastSavedValues] = useState<Record<string, string | boolean>>(task.formValues ?? {});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [redirectRole, setRedirectRole] = useState<Role | "">("");
   const [showRedirectAccordion, setShowRedirectAccordion] = useState(true);
@@ -56,6 +65,8 @@ export function TaskForm({ task, selectedNodeType, onComplete, onSave }: TaskFor
   const [branchARole, setBranchARole] = useState<Role | "">("");
   const [branchBRole, setBranchBRole] = useState<Role | "">("");
   const [xorSelectedCondition, setXorSelectedCondition] = useState<"critical" | "non_critical" | "">("");
+  const [hasSavedSinceLoad, setHasSavedSinceLoad] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   const triageColorToStatusLabel = (triageColor?: TriageColor): string | undefined => {
     if (triageColor === "red") return "Immediate";
@@ -68,6 +79,12 @@ export function TaskForm({ task, selectedNodeType, onComplete, onSave }: TaskFor
 
   const resetForm = useCallback(() => {
     const seededValues: Record<string, string | boolean> = { ...(task.formValues ?? {}) };
+    if (typeof seededValues.patient_name !== "string") {
+      seededValues.patient_name = task.patientName;
+    }
+    if (typeof seededValues.patient_id !== "string") {
+      seededValues.patient_id = task.patientId;
+    }
     const triageLabel = triageColorToStatusLabel(task.triageColor);
     if (triageLabel && typeof seededValues.urgency !== "string") {
       seededValues.urgency = triageLabel;
@@ -76,7 +93,6 @@ export function TaskForm({ task, selectedNodeType, onComplete, onSave }: TaskFor
       seededValues.severity = triageLabel;
     }
     setValues(seededValues);
-    setLastSavedValues(seededValues);
     setErrors({});
     setRedirectRole("");
     setShowRedirectAccordion(true);
@@ -84,16 +100,18 @@ export function TaskForm({ task, selectedNodeType, onComplete, onSave }: TaskFor
     setBranchARole("");
     setBranchBRole("");
     setXorSelectedCondition("");
-  }, [task.formValues, task.triageColor]);
+    setHasSavedSinceLoad(false);
+    setHasUnsavedChanges(false);
+  }, [task.formValues, task.patientId, task.patientName, task.triageColor]);
 
   useEffect(() => {
     resetForm();
-  }, [resetForm, task.id, task.status, task.updatedAt]);
-
-  const isDirty = JSON.stringify(values) !== JSON.stringify(lastSavedValues);
+  }, [resetForm, task.id]);
 
   const setFieldValue = (fieldId: string, value: string | boolean) => {
     setValues((prev) => ({ ...prev, [fieldId]: value }));
+    setHasSavedSinceLoad(false);
+    setHasUnsavedChanges(true);
     setErrors((prev) => {
       if (!prev[fieldId]) return prev;
       const { [fieldId]: _removed, ...rest } = prev;
@@ -102,7 +120,7 @@ export function TaskForm({ task, selectedNodeType, onComplete, onSave }: TaskFor
   };
 
   const validate = () => {
-    const nextErrors = buildRequiredFieldErrors(task.formFields, values);
+    const nextErrors = buildRequiredFieldErrors(effectiveFormFields, values);
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };
@@ -145,13 +163,14 @@ export function TaskForm({ task, selectedNodeType, onComplete, onSave }: TaskFor
   const buildSavePayload = () => ({
     formValues: values,
     triageColor: inferTriageColorFromForm(),
-    patientName: findFirstStringFieldValue(task.formFields, values, ["patient_name", "patientName"], ["patient name"]),
-    patientId: findFirstStringFieldValue(task.formFields, values, ["patient_id", "patientId"], ["patient id"]),
+    patientName: findFirstStringFieldValue(effectiveFormFields, values, ["patient_name", "patientName"], ["patient name"]),
+    patientId: findFirstStringFieldValue(effectiveFormFields, values, ["patient_id", "patientId"], ["patient id"]),
   });
 
   const handleSave = async () => {
     await onSave(buildSavePayload());
-    setLastSavedValues(values);
+    setHasSavedSinceLoad(true);
+    setHasUnsavedChanges(false);
     toast({
       title: "Saved",
       description: "Task updates are now visible on the task card and header.",
@@ -211,7 +230,7 @@ export function TaskForm({ task, selectedNodeType, onComplete, onSave }: TaskFor
       });
       return;
     }
-    if (isDirty) {
+    if (hasUnsavedChanges) {
       toast({
         title: "Save required",
         description: "Save changes before completing this task.",
@@ -219,9 +238,17 @@ export function TaskForm({ task, selectedNodeType, onComplete, onSave }: TaskFor
       });
       return;
     }
+    if (!hasSavedSinceLoad) {
+      toast({
+        title: "Save required",
+        description: "Click Save before completing this task.",
+        variant: "destructive",
+      });
+      return;
+    }
     toast({ title: "Task completed", description: `"${task.name}" has been completed and the process advanced.` });
     await onComplete({
-      redirectRole: effectiveRedirectRole || effectiveBranchARole || task.role,
+      redirectRole: (effectiveRedirectRole || effectiveBranchARole || effectiveBranchBRole || task.role) as Role,
       branchARole: selectedNodeType === "andGateway" ? (effectiveBranchARole || undefined) : undefined,
       branchBRole: selectedNodeType === "andGateway" ? (effectiveBranchBRole || undefined) : undefined,
       xorSelectedCondition: selectedNodeType === "xorGateway" ? (effectiveXorCondition || undefined) : undefined,
@@ -245,7 +272,7 @@ export function TaskForm({ task, selectedNodeType, onComplete, onSave }: TaskFor
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {task.formFields.map((field) => (
+      {effectiveFormFields.map((field) => (
         <div key={field.id} className="space-y-1.5">
           <Label className="text-xs font-medium">
             {field.label}

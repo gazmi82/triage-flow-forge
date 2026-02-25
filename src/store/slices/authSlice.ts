@@ -1,6 +1,6 @@
 import { createAsyncThunk, createSlice, type PayloadAction } from "@reduxjs/toolkit";
 import type { AuthPayload, Role } from "@/data/mockData";
-import { mockApi } from "@/data/mockApi";
+import { appApi } from "@/data/appApi";
 
 const SESSION_KEY = "triage.auth.user";
 
@@ -47,7 +47,7 @@ export const loginThunk = createAsyncThunk<AuthPayload, { email: string; passwor
   "auth/login",
   async (payload, { rejectWithValue }) => {
     try {
-      return await mockApi.login(payload.email, payload.password);
+      return await appApi.login(payload.email, payload.password);
     } catch (error) {
       return rejectWithValue(error instanceof Error ? error.message : "Unable to sign in.");
     }
@@ -60,7 +60,7 @@ export const registerThunk = createAsyncThunk<
   { rejectValue: string }
 >("auth/register", async (payload, { rejectWithValue }) => {
   try {
-    return await mockApi.register(payload);
+    return await appApi.register(payload);
   } catch (error) {
     return rejectWithValue(error instanceof Error ? error.message : "Unable to register.");
   }

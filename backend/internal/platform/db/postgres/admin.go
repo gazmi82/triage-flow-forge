@@ -1,0 +1,154 @@
+package postgres
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"regexp"
+	"strings"
+
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
+	"golang.org/x/crypto/bcrypt"
+)
+
+var emailRegex = regexp.MustCompile(`^[^\s@]+@[^\s@]+\.[^\s@]+$`)
+
+func (c *Client) CreateUser(ctx context.Context, req AdminCreateUserRequest) (AdminCreateUserResponse, error) {
+	pool, err := c.ensurePool(ctx)
+	if err != nil {
+		return AdminCreateUserResponse{}, err
+	}
+
+	name := strings.TrimSpace(req.Name)
+	email := strings.TrimSpace(strings.ToLower(req.Email))
+	department := strings.TrimSpace(req.Department)
+	password := req.Password
+	active := true
+	if req.Active != nil {
+		active = *req.Active
+	}
+
+	if len(name) < 2 {
+		return AdminCreateUserResponse{}, errors.New("name must be at least 2 characters")
+	}
+	if !emailRegex.MatchString(email) {
+		return AdminCreateUserResponse{}, errors.New("please provide a valid email address")
+	}
+	if len(department) < 2 {
+		return AdminCreateUserResponse{}, errors.New("department must be at least 2 characters")
+	}
+	if len(password) < 6 {
+		return AdminCreateUserResponse{}, errors.New("password must be at least 6 characters")
+	}
+
+	tx, err := pool.BeginTx(ctx, pgx.TxOptions{})
+	if err != nil {
+		return AdminCreateUserResponse{}, err
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	var maxSuffix int
+	if err := tx.QueryRow(ctx, `
+SELECT COALESCE(MAX(CAST(SUBSTRING(id FROM 2) AS INTEGER)), 0)
+FROM users
+WHERE id ~ '^u[0-9]+$'
+`).Scan(&maxSuffix); err != nil {
+		return AdminCreateUserResponse{}, err
+	}
+	newID := fmt.Sprintf("u%d", maxSuffix+1)
+
+	_, err = tx.Exec(ctx, `
+INSERT INTO users (id, name, email, primary_role_key, department, active)
+VALUES ($1, $2, $3, $4, $5, $6)
+`, newID, name, email, req.Role, department, active)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return AdminCreateUserResponse{}, errors.New("a user with this email already exists")
+		}
+		return AdminCreateUserResponse{}, err
+	}
+
+	_, err = tx.Exec(ctx, `
+INSERT INTO user_roles (user_id, role_key, is_primary)
+VALUES ($1, $2, TRUE)
+ON CONFLICT (user_id, role_key) DO UPDATE
+SET is_primary = EXCLUDED.is_primary
+`, newID, req.Role)
+	if err != nil {
+		return AdminCreateUserResponse{}, err
+	}
+
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return AdminCreateUserResponse{}, err
+	}
+
+	_, err = tx.Exec(ctx, `
+INSERT INTO credentials (user_id, email, password_hash, hash_algorithm)
+VALUES ($1, $2, $3, 'bcrypt')
+`, newID, email, string(hash))
+	if err != nil {
+		if isUniqueViolation(err) {
+			return AdminCreateUserResponse{}, errors.New("a user with this email already exists")
+		}
+		return AdminCreateUserResponse{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return AdminCreateUserResponse{}, err
+	}
+
+	users, err := c.FetchUsers(ctx)
+	if err != nil {
+		return AdminCreateUserResponse{}, err
+	}
+
+	created := User{
+		ID:         newID,
+		Name:       name,
+		Email:      email,
+		Role:       req.Role,
+		Department: department,
+		Active:     active,
+	}
+
+	return AdminCreateUserResponse{Users: users, CreatedUser: created}, nil
+}
+
+func (c *Client) FetchUsers(ctx context.Context) ([]User, error) {
+	pool, err := c.ensurePool(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := pool.Query(ctx, `
+SELECT id, name, email, primary_role_key, department, active
+FROM users
+ORDER BY id
+`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	users := make([]User, 0)
+	for rows.Next() {
+		var u User
+		if err := rows.Scan(&u.ID, &u.Name, &u.Email, &u.Role, &u.Department, &u.Active); err != nil {
+			return nil, err
+		}
+		users = append(users, u)
+	}
+	return users, rows.Err()
+}
+
+func isUniqueViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		return pgErr.Code == "23505"
+	}
+	return false
+}

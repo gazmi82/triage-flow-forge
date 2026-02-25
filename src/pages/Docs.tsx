@@ -188,6 +188,127 @@ const DOC_GROUPS: DocGroup[] = [
         ],
       },
       {
+        id: "task-runtime-contract",
+        title: "Task Runtime Contract (Frontend + Go)",
+        summary:
+          "Canonical implementation contract for task creation, save edits, and completion across React/Redux and Go/Postgres APIs.",
+        sections: [
+          {
+            heading: "Canonical API Endpoints",
+            body: [
+              "Create task from console: POST `/api/tasks/create-from-console`.",
+              "Claim task: POST `/api/tasks/{taskId}/claim`.",
+              "Save edits: PATCH `/api/tasks/{taskId}`. Backend currently also accepts PUT/POST for compatibility.",
+              "Complete task: POST `/api/tasks/{taskId}/complete`.",
+              "All mutation endpoints return aggregate payload: `tasks`, `savedTasks`, `graph`, `instances`, `audit`.",
+            ],
+          },
+          {
+            heading: "Create Task Behavior",
+            body: [
+              "Task creation in Task Console writes both runtime row(s) and graph projection updates in one transaction.",
+              "If the instance does not exist, backend creates `process_instances` first, then writes `tasks` to satisfy FK constraints.",
+              "Created user tasks now seed default `formFields` with `patient_name`, `patient_id`, and `notes` so the form always renders actionable inputs.",
+              "Initial `formValues` are hydrated from payload where possible (`patient_name`, `patient_id`).",
+              "Designer graph receives start node auto-creation when necessary and sequence edge wiring from source node when provided.",
+            ],
+          },
+          {
+            heading: "Save Edits Behavior",
+            body: [
+              "Save writes form values, patient data, triage color, computed priority/category/SLA, dueAt, and updated label.",
+              "Save also upserts `saved_tasks.snapshot` and refreshes `process_instances` patient/priority/current node metadata.",
+              "Save is non-terminal: task remains open/claimed and visible to the owning role.",
+              "UI state refreshes immediately from mutation response so inbox card, header badges, and top-bar context stay aligned with latest values.",
+            ],
+          },
+          {
+            heading: "Complete Behavior",
+            body: [
+              "Complete marks current task status as `completed`, appends audit event, closes saved snapshot, and refreshes instance current node/status.",
+              "After completion, frontend orchestrates downstream node/task generation based on selected Shape/Type and routing controls.",
+              "XOR: one branch based on active condition + assigned role; AND: two parallel branches; non-user intermediate nodes can auto-generate follow-up user task.",
+              "Forwarded form payload to downstream tasks excludes UI-only routing fields (`redirect_role`, branch selectors, xor selector).",
+            ],
+          },
+          {
+            heading: "Form UX Rules",
+            body: [
+              "Users can edit: shape/type intent, task label, urgency status, patient fields, notes, and redirect/gateway routing controls.",
+              "Complete is blocked until a successful Save has occurred for the current task session (`hasSavedSinceLoad`).",
+              "Complete is blocked when there are unsaved edits (`hasUnsavedChanges`) to avoid submitting stale payload.",
+              "Fallback form-field rendering exists in UI for legacy tasks with empty `formFields`, ensuring Patient Name/ID/Notes are always visible.",
+              "Redirect role is required for non-gateway completion paths; gateway-specific role/condition validations apply for XOR and AND.",
+            ],
+          },
+          {
+            heading: "Data + SQL Guarantees",
+            body: [
+              "No `FOR UPDATE` in schema SQL (`triage.sql`); row locks are runtime query concerns in backend mutation code.",
+              "Task snapshot query and saved-task upsert are centralized in backend helpers for consistency.",
+              "Instance refresh logic derives current node from newest non-completed task, otherwise marks instance as completed.",
+              "Mutation transactions are designed to avoid partial updates between `tasks`, `saved_tasks`, `process_instances`, and `audit_events`.",
+            ],
+          },
+          {
+            heading: "Source Files (Current Runtime Path)",
+            body: [
+              "Frontend orchestration: `src/pages/Tasks.tsx`, `src/pages/tasks/TaskForm.tsx`.",
+              "Redux thunks/reducers: `src/store/slices/workflowSlice.ts`.",
+              "Client transport: `src/data/apiClient.ts`, `src/data/appApi.ts`.",
+              "Backend routing: `backend/internal/transport/http/router.go`.",
+              "Backend persistence logic: `backend/internal/platform/db/postgres/task_creation.go`, `tasks.go`, `models.go`.",
+              "Schema and contract references: `backend/triage.sql`, `workflow.definition.json`, `src/data/mockData.ts`.",
+            ],
+          },
+        ],
+        diagramAreas: [
+          {
+            id: "r1",
+            title: "Diagram Area R1: Create -> Save -> Complete Sequence",
+            focus: "Operational sequence and response contract for one task lifecycle.",
+            map: [
+              "POST /api/tasks/create-from-console -> aggregate response",
+              "PATCH /api/tasks/{id} -> aggregate response (save edits)",
+              "POST /api/tasks/{id}/complete -> aggregate response",
+              "POST /api/tasks/create-from-console (downstream task generation)",
+            ],
+            details: [
+              "Each step returns enough state to redraw inbox, header badges, timeline, and graph projection without extra fetches.",
+              "Frontend uses reducer updates directly from mutation payload to keep UX deterministic.",
+            ],
+          },
+          {
+            id: "r2",
+            title: "Diagram Area R2: Save Gate Logic",
+            focus: "Why one Save must happen before Complete and how repeat-save glitches were removed.",
+            map: [
+              "field edit -> hasUnsavedChanges=true, hasSavedSinceLoad=false",
+              "save success -> hasUnsavedChanges=false, hasSavedSinceLoad=true",
+              "complete allowed only if: hasSavedSinceLoad && !hasUnsavedChanges",
+            ],
+            details: [
+              "Previous JSON-based dirty compare was replaced with explicit flags to prevent false negatives/positives after save responses.",
+              "Form reset now occurs on task identity change only, not every updatedAt tick.",
+            ],
+          },
+          {
+            id: "r3",
+            title: "Diagram Area R3: Backend Transaction Boundaries",
+            focus: "Write ordering to maintain FK integrity and snapshot coherence.",
+            map: [
+              "create: upsert instance -> upsert graph -> insert/update task -> upsert saved snapshot -> audit",
+              "save: lock task -> update task fields -> upsert saved snapshot -> refresh instance",
+              "complete: update task status -> write audit -> close snapshot -> refresh instance current node/status",
+            ],
+            details: [
+              "Order prevents FK violations (`tasks.instance_id_fkey`) and stale instance views.",
+              "Shared snapshot helper ensures saved-task records stay aligned with latest task payload shape.",
+            ],
+          },
+        ],
+      },
+      {
         id: "designer-projection",
         title: "Designer Projection",
         summary: "How process graphs reflect runtime state while staying instance-isolated.",

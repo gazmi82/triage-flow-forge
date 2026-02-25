@@ -28,6 +28,16 @@ const getDisplayPatientName = (value: string) => {
   return value;
 };
 
+const sanitizeForwardedFormValues = (values?: Record<string, string | boolean>) => {
+  if (!values) return {};
+  const next = { ...values };
+  delete next.redirect_role;
+  delete next.branch_a_role;
+  delete next.branch_b_role;
+  delete next.xor_active_condition;
+  return next;
+};
+
 export default function Tasks() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
@@ -116,6 +126,7 @@ export default function Tasks() {
     if (!selectedTask) return;
 
     const completedTask = selectedTask;
+    const forwardedFormValues = sanitizeForwardedFormValues(completedTask.formValues ?? {});
     await dispatch(
       completeTaskThunk({
         taskId: completedTask.id,
@@ -139,7 +150,7 @@ export default function Tasks() {
         createdByRole: user?.role ?? "triage_nurse",
         patientName: payload.patientName ?? completedTask.patientName,
         patientId: payload.patientId ?? completedTask.patientId,
-        formValues: completedTask.formValues ?? {},
+        formValues: forwardedFormValues,
         registrationNote: `Auto-generated after completing ${completedTask.name}`,
       })
     );
@@ -158,7 +169,7 @@ export default function Tasks() {
           createdByRole: user?.role ?? "triage_nurse",
           patientName: payload.patientName ?? completedTask.patientName,
           patientId: payload.patientId ?? completedTask.patientId,
-          formValues: completedTask.formValues ?? {},
+          formValues: forwardedFormValues,
           registrationNote: "Auto-generated after andGateway branch A",
         })
       );
@@ -173,7 +184,7 @@ export default function Tasks() {
           createdByRole: user?.role ?? "triage_nurse",
           patientName: payload.patientName ?? completedTask.patientName,
           patientId: payload.patientId ?? completedTask.patientId,
-          formValues: completedTask.formValues ?? {},
+          formValues: forwardedFormValues,
           registrationNote: "Auto-generated after andGateway branch B",
         })
       );
@@ -205,7 +216,7 @@ export default function Tasks() {
           createdByRole: user?.role ?? "triage_nurse",
           patientName: payload.patientName ?? completedTask.patientName,
           patientId: payload.patientId ?? completedTask.patientId,
-          formValues: completedTask.formValues ?? {},
+          formValues: forwardedFormValues,
           registrationNote: `Auto-generated after xorGateway (${selectedCondition})`,
         })
       );
@@ -221,7 +232,7 @@ export default function Tasks() {
           createdByRole: user?.role ?? "triage_nurse",
           patientName: payload.patientName ?? completedTask.patientName,
           patientId: payload.patientId ?? completedTask.patientId,
-          formValues: completedTask.formValues ?? {},
+          formValues: forwardedFormValues,
           registrationNote: `Auto-generated after ${selectedNodeType}`,
         })
       );

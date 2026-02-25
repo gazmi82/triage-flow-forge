@@ -10,7 +10,7 @@ import {
   type NodeChange,
 } from "@xyflow/react";
 import { appQueryClient } from "@/data/queryClient";
-import { mockApi } from "@/data/mockApi";
+import { appApi } from "@/data/appApi";
 import {
   type AdminCreateUserRequest,
   type AdminCreateUserResponse,
@@ -68,24 +68,24 @@ const initialState: WorkflowState = {
   error: null,
 };
 
-type BootstrapPayload = Awaited<ReturnType<typeof mockApi.fetchBootstrapData>>;
-type ClaimTaskPayload = Awaited<ReturnType<typeof mockApi.claimTask>>;
-type CompleteTaskPayload = Awaited<ReturnType<typeof mockApi.completeTask>>;
-type SaveTaskEditsPayload = Awaited<ReturnType<typeof mockApi.saveTaskEdits>>;
-type CreateTaskFromConsoleResult = Awaited<ReturnType<typeof mockApi.createTaskFromConsole>>;
-type SaveDraftPayload = Awaited<ReturnType<typeof mockApi.saveDraft>>;
-type PublishDesignerPayload = Awaited<ReturnType<typeof mockApi.publishDesignerGraph>>;
+type BootstrapPayload = Awaited<ReturnType<typeof appApi.fetchBootstrapData>>;
+type ClaimTaskPayload = Awaited<ReturnType<typeof appApi.claimTask>>;
+type CompleteTaskPayload = Awaited<ReturnType<typeof appApi.completeTask>>;
+type SaveTaskEditsPayload = Awaited<ReturnType<typeof appApi.saveTaskEdits>>;
+type CreateTaskFromConsoleResult = Awaited<ReturnType<typeof appApi.createTaskFromConsole>>;
+type SaveDraftPayload = Awaited<ReturnType<typeof appApi.saveDraft>>;
+type PublishDesignerPayload = Awaited<ReturnType<typeof appApi.publishDesignerGraph>>;
 type LoadDraftPayload = { draft: DraftRecord };
 type OpenTaskDesignerPayload = {
   taskId: string;
-  graph: Awaited<ReturnType<typeof mockApi.fetchTaskDesignerGraph>>;
+  graph: Awaited<ReturnType<typeof appApi.fetchTaskDesignerGraph>>;
 };
 type CreateUserPayload = AdminCreateUserResponse;
 
 export const bootstrapWorkflowThunk = createAsyncThunk<BootstrapPayload>("workflow/bootstrap", async () => {
   return await appQueryClient.fetchQuery({
     queryKey: ["mock-data", "workflow-bootstrap"],
-    queryFn: () => mockApi.fetchBootstrapData(),
+    queryFn: () => appApi.fetchBootstrapData(),
     staleTime: 5 * 60 * 1000,
   });
 });
@@ -93,7 +93,7 @@ export const bootstrapWorkflowThunk = createAsyncThunk<BootstrapPayload>("workfl
 export const claimTaskThunk = createAsyncThunk<ClaimTaskPayload, { taskId: string; assigneeName: string }>(
   "workflow/claimTask",
   async (payload) => {
-    return await mockApi.claimTask(payload.taskId, payload.assigneeName);
+    return await appApi.claimTask(payload.taskId, payload.assigneeName);
   }
 );
 
@@ -103,7 +103,7 @@ export const completeTaskThunk = createAsyncThunk<
 >(
   "workflow/completeTask",
   async (payload) => {
-    return await mockApi.completeTask(payload.taskId, payload.actor, payload.patientName, payload.patientId);
+    return await appApi.completeTask(payload.taskId, payload.actor, payload.patientName, payload.patientId);
   }
 );
 
@@ -119,7 +119,7 @@ export const saveTaskEditsThunk = createAsyncThunk<
     patientId?: string;
   }
 >("workflow/saveTaskEdits", async (payload) => {
-  return await mockApi.saveTaskEdits(payload.taskId, {
+  return await appApi.saveTaskEdits(payload.taskId, {
     actor: payload.actor,
     formValues: payload.formValues,
     triageColor: payload.triageColor,
@@ -132,7 +132,7 @@ export const saveTaskEditsThunk = createAsyncThunk<
 export const createTaskFromConsoleThunk = createAsyncThunk(
   "workflow/createTaskFromConsole",
   async (payload: CreateTaskFromConsolePayload): Promise<CreateTaskFromConsoleResult> => {
-    return await mockApi.createTaskFromConsole(payload);
+    return await appApi.createTaskFromConsole(payload);
   }
 );
 
@@ -140,7 +140,7 @@ export const saveDraftThunk = createAsyncThunk<SaveDraftPayload, void, { state: 
   "workflow/saveDraft",
   async (_, { getState }) => {
     const state = getState();
-    return await mockApi.saveDraft({
+    return await appApi.saveDraft({
       nodes: state.workflow.designerNodes as unknown as DesignerGraphNode[],
       edges: state.workflow.designerEdges as unknown as DesignerGraphEdge[],
     });
@@ -153,7 +153,7 @@ export const publishDesignerThunk = createAsyncThunk<
   { state: { workflow: WorkflowState } }
 >("workflow/publishDesigner", async (_, { getState }) => {
   const state = getState();
-  return await mockApi.publishDesignerGraph({
+  return await appApi.publishDesignerGraph({
     nodes: state.workflow.designerNodes as unknown as DesignerGraphNode[],
     edges: state.workflow.designerEdges as unknown as DesignerGraphEdge[],
   });
@@ -162,7 +162,7 @@ export const publishDesignerThunk = createAsyncThunk<
 export const loadDraftThunk = createAsyncThunk<LoadDraftPayload, { draftId: string }>(
   "workflow/loadDraft",
   async (payload) => {
-    const drafts = await mockApi.fetchDrafts();
+    const drafts = await appApi.fetchDrafts();
     const draft = drafts.find((item) => item.id === payload.draftId);
     if (!draft) {
       throw new Error("Draft not found.");
@@ -174,7 +174,7 @@ export const loadDraftThunk = createAsyncThunk<LoadDraftPayload, { draftId: stri
 export const openTaskDesignerThunk = createAsyncThunk<OpenTaskDesignerPayload, { taskId: string }>(
   "workflow/openTaskDesigner",
   async (payload) => {
-    const graph = await mockApi.fetchTaskDesignerGraph(payload.taskId);
+    const graph = await appApi.fetchTaskDesignerGraph(payload.taskId);
     return { taskId: payload.taskId, graph };
   }
 );
@@ -182,7 +182,7 @@ export const openTaskDesignerThunk = createAsyncThunk<OpenTaskDesignerPayload, {
 export const createUserThunk = createAsyncThunk<CreateUserPayload, AdminCreateUserRequest>(
   "workflow/createUser",
   async (payload) => {
-    return await mockApi.createUser(payload);
+    return await appApi.createUser(payload);
   }
 );
 
