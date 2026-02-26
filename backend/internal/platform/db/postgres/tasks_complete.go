@@ -74,7 +74,7 @@ VALUES ($1, $2, $3, NOW(), $4, $5, 'task_completed', $6, $7, $8)
 	if err != nil {
 		return TaskMutationResponse{}, err
 	}
-	err = c.upsertSavedTaskSnapshot(ctx, tx, taskID, instanceID, "closed", taskSnapshot)
+	err = c.upsertSavedTaskSnapshot(ctx, tx, taskID, instanceID, "open", taskSnapshot)
 	if err != nil {
 		return TaskMutationResponse{}, err
 	}

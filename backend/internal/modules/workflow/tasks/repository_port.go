@@ -8,6 +8,7 @@ import (
 
 type Repository interface {
 	FetchTasks(ctx context.Context) ([]postgres.Task, error)
+	FetchTaskDesignerGraph(ctx context.Context, taskID string) (postgres.DesignerGraphPayload, error)
 	ClaimTask(ctx context.Context, taskID, assigneeName string) (postgres.TaskMutationResponse, error)
 	SaveTaskEdits(ctx context.Context, taskID string, req postgres.SaveTaskEditsRequest) (postgres.TaskMutationResponse, error)
 	CompleteTask(ctx context.Context, taskID string, req postgres.CompleteTaskRequest) (postgres.TaskMutationResponse, error)

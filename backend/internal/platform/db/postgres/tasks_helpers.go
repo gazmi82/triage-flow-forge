@@ -91,16 +91,13 @@ LIMIT 1
 `, instanceID).Scan(&currentNode)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			currentNode = "Completed"
+			currentNode = "Awaiting Next Step"
 		} else {
 			return err
 		}
 	}
 
 	status := "active"
-	if currentNode == "Completed" {
-		status = "completed"
-	}
 	err = c.execTx(ctx, tx, "instance.current_node.update", `
 UPDATE process_instances
 SET current_node = $2, status = $3, patient_name = $4, patient_id = $5, updated_at = NOW()

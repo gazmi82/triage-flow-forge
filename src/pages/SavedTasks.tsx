@@ -19,7 +19,8 @@ type SortDirection = "asc" | "desc";
 type ViewMode = "table" | "cards";
 type ProcessStatus = "all" | "open" | "closed";
 const isGeneratedPatientName = (name: string) => /^generated from task console$/i.test(name.trim());
-const getEffectiveProcessStatus = (task: { status: string }) => (task.status === "completed" ? "closed" : "open");
+const getEffectiveProcessStatus = (task: { status: string; processStatus?: "open" | "closed" }) =>
+  task.processStatus ?? (task.status === "completed" ? "closed" : "open");
 
 export default function SavedTasks() {
   const dispatch = useAppDispatch();

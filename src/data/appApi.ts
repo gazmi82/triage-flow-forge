@@ -33,6 +33,13 @@ export const appApi = {
     return apiClient.fetchTasks();
   },
 
+  async fetchTaskDesignerGraph(taskId: string) {
+    if (!useRealApi) {
+      return mockApi.fetchTaskDesignerGraph(taskId);
+    }
+    return apiClient.fetchTaskDesignerGraph(taskId);
+  },
+
   async claimTask(taskId: string, assigneeName: string) {
     if (!useRealApi) {
       return mockApi.claimTask(taskId, assigneeName);

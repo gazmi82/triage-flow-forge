@@ -18,6 +18,10 @@ func (r *Repository) FetchTasks(ctx context.Context) ([]postgres.Task, error) {
 	return r.client.FetchTasks(ctx)
 }
 
+func (r *Repository) FetchTaskDesignerGraph(ctx context.Context, taskID string) (postgres.DesignerGraphPayload, error) {
+	return r.client.FetchTaskDesignerGraph(ctx, taskID)
+}
+
 func (r *Repository) ClaimTask(ctx context.Context, taskID, assigneeName string) (postgres.TaskMutationResponse, error) {
 	return r.client.ClaimTask(ctx, taskID, assigneeName)
 }

@@ -28,6 +28,21 @@ func (s *server) handleTasks(w http.ResponseWriter, r *http.Request) {
 func (s *server) handleTaskActions(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/api/tasks/")
 	switch {
+	case r.Method == http.MethodGet && strings.HasSuffix(path, "/designer"):
+		taskID := strings.Trim(strings.TrimSuffix(path, "/designer"), "/")
+		if taskID == "" {
+			writeError(w, http.StatusBadRequest, "taskId is required")
+			return
+		}
+
+		graph, err := s.deps.Tasks.FetchTaskDesignerGraph(r.Context(), taskID)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, graph)
+		return
+
 	case r.Method == http.MethodPost && strings.HasSuffix(path, "/claim"):
 		taskID := strings.Trim(strings.TrimSuffix(path, "/claim"), "/")
 		if taskID == "" {

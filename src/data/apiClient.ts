@@ -258,4 +258,20 @@ export const apiClient = {
       instanceId: string;
     };
   },
+
+  async fetchTaskDesignerGraph(taskId: string): Promise<DesignerGraphPayload> {
+    const response = await fetch(endpoint(`/api/tasks/${encodeURIComponent(taskId)}/designer`), {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        Accept: "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(await parseErrorMessage(response));
+    }
+
+    return (await response.json()) as DesignerGraphPayload;
+  },
 };

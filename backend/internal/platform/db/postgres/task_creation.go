@@ -60,6 +60,11 @@ func (c *Client) CreateTaskFromConsole(ctx context.Context, req CreateTaskFromCo
 	if err != nil {
 		return CreateTaskFromConsoleResponse{}, err
 	}
+	if normalizedNodeType == "endEvent" {
+		if err := c.markInstanceClosed(ctx, tx, instanceID); err != nil {
+			return CreateTaskFromConsoleResponse{}, err
+		}
+	}
 
 	if err := tx.Commit(ctx); err != nil {
 		return CreateTaskFromConsoleResponse{}, err
