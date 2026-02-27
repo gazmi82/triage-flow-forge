@@ -12,7 +12,7 @@ export function StartEventNode({ data, selected }: NodeProps) {
       runtimeActive && "ring-2 ring-success ring-offset-2"
     )}>
       <div className="h-4 w-4 rounded-full bg-node-start" />
-      <Handle type="source" position={Position.Right} className="!bg-node-start !border-node-start" />
+      <Handle id="right" type="source" position={Position.Right} className="!bg-node-start !border-node-start" />
       {data.label && (
         <div className="absolute top-12 left-1/2 -translate-x-1/2 whitespace-nowrap text-xs font-medium text-foreground">
           {String(data.label)}
@@ -32,7 +32,7 @@ export function EndEventNode({ data, selected }: NodeProps) {
       runtimeActive && "ring-2 ring-success ring-offset-2"
     )}>
       <div className="h-5 w-5 rounded-full bg-node-end" />
-      <Handle type="target" position={Position.Left} className="!bg-node-end !border-node-end" />
+      <Handle id="left" type="target" position={Position.Left} className="!bg-node-end !border-node-end" />
       {data.label && (
         <div className="absolute top-12 left-1/2 -translate-x-1/2 whitespace-nowrap text-xs font-medium text-foreground">
           {String(data.label)}
@@ -75,8 +75,14 @@ export function UserTaskNode({ data, selected }: NodeProps) {
           <span className="ml-1 inline-flex h-2 w-2 animate-pulse rounded-full bg-success align-middle" />
         )}
       </div>
-      <Handle type="target" position={Position.Left} className="!bg-node-task !border-node-task" />
-      <Handle type="source" position={Position.Right} className="!bg-node-task !border-node-task" />
+      <Handle id="left" type="target" position={Position.Left} className="!bg-node-task !border-node-task" />
+      <Handle id="top" type="target" position={Position.Top} className="!bg-node-task !border-node-task" />
+      <Handle id="bottom" type="target" position={Position.Bottom} className="!bg-node-task !border-node-task" />
+      <Handle id="right" type="target" position={Position.Right} className="!bg-node-task !border-node-task" />
+      <Handle id="right" type="source" position={Position.Right} className="!bg-node-task !border-node-task" />
+      <Handle id="left" type="source" position={Position.Left} className="!bg-node-task !border-node-task" />
+      <Handle id="top" type="source" position={Position.Top} className="!bg-node-task !border-node-task" />
+      <Handle id="bottom" type="source" position={Position.Bottom} className="!bg-node-task !border-node-task" />
     </div>
   );
 }
@@ -92,9 +98,14 @@ export function XorGatewayNode({ data, selected }: NodeProps) {
         runtimeActive && "ring-2 ring-success ring-offset-2"
       )} />
       <span className="absolute text-base font-bold text-node-gateway-xor" style={{ transform: "rotate(-45deg)" }}>✕</span>
-      <Handle type="target" position={Position.Left} style={{ transform: "rotate(-45deg) translate(-8px, 0)" }} className="!bg-node-gateway-xor !border-node-gateway-xor" />
-      <Handle type="source" position={Position.Right} style={{ transform: "rotate(-45deg) translate(8px, 0)" }} className="!bg-node-gateway-xor !border-node-gateway-xor" />
+      <Handle id="left" type="target" position={Position.Left} style={{ transform: "rotate(-45deg) translate(-8px, 0)" }} className="!bg-node-gateway-xor !border-node-gateway-xor" />
+      <Handle id="top" type="target" position={Position.Top} style={{ transform: "rotate(-45deg) translate(0, -8px)" }} className="!bg-node-gateway-xor !border-node-gateway-xor" />
+      <Handle id="bottom" type="target" position={Position.Bottom} style={{ transform: "rotate(-45deg) translate(0, 8px)" }} className="!bg-node-gateway-xor !border-node-gateway-xor" />
+      <Handle id="right" type="target" position={Position.Right} style={{ transform: "rotate(-45deg) translate(8px, 0)" }} className="!bg-node-gateway-xor !border-node-gateway-xor" />
+      <Handle id="right" type="source" position={Position.Right} style={{ transform: "rotate(-45deg) translate(8px, 0)" }} className="!bg-node-gateway-xor !border-node-gateway-xor" />
+      <Handle id="left" type="source" position={Position.Left} style={{ transform: "rotate(-45deg) translate(-8px, 0)" }} className="!bg-node-gateway-xor !border-node-gateway-xor" />
       <Handle type="source" id="bottom" position={Position.Bottom} style={{ transform: "rotate(-45deg) translate(0, 8px)" }} className="!bg-node-gateway-xor !border-node-gateway-xor" />
+      <Handle type="source" id="top" position={Position.Top} style={{ transform: "rotate(-45deg) translate(0, -8px)" }} className="!bg-node-gateway-xor !border-node-gateway-xor" />
       {data.label && (
         <div className="absolute top-14 left-1/2 -translate-x-1/2 whitespace-nowrap text-xs font-medium text-foreground" style={{ transform: "rotate(-45deg) translateX(-50%)" }}>
           {String(data.label)}
@@ -115,7 +126,24 @@ export function AndGatewayNode({ data, selected }: NodeProps) {
         runtimeActive && "ring-2 ring-success ring-offset-2"
       )} />
       <span className="absolute text-lg font-bold text-node-gateway-and" style={{ transform: "rotate(-45deg)" }}>+</span>
-      <Handle type="target" position={Position.Left} style={{ transform: "rotate(-45deg) translate(-8px, 0)" }} className="!bg-node-gateway-and !border-node-gateway-and" />
+      <Handle id="left" type="target" position={Position.Left} style={{ transform: "rotate(-45deg) translate(-8px, 0)" }} className="!bg-node-gateway-and !border-node-gateway-and" />
+      <Handle id="top" type="target" position={Position.Top} style={{ transform: "rotate(-45deg) translate(0, -8px)" }} className="!bg-node-gateway-and !border-node-gateway-and" />
+      <Handle id="bottom" type="target" position={Position.Bottom} style={{ transform: "rotate(-45deg) translate(0, 8px)" }} className="!bg-node-gateway-and !border-node-gateway-and" />
+      <Handle id="right" type="target" position={Position.Right} style={{ transform: "rotate(-45deg) translate(8px, 0)" }} className="!bg-node-gateway-and !border-node-gateway-and" />
+      <Handle
+        type="source"
+        id="right"
+        position={Position.Right}
+        style={{ transform: "rotate(-45deg) translate(8px, 0)" }}
+        className="!bg-node-gateway-and !border-node-gateway-and"
+      />
+      <Handle
+        type="source"
+        id="left"
+        position={Position.Left}
+        style={{ transform: "rotate(-45deg) translate(-8px, 0)" }}
+        className="!bg-node-gateway-and !border-node-gateway-and"
+      />
       <Handle
         type="source"
         id="top"

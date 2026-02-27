@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"triage-flow-forge/backend/internal/platform/db/postgres/taskcreation"
 )
 
 const defaultAssigneeName = "Unassigned"
@@ -108,332 +109,42 @@ WHERE definition_id = $1
 }
 
 func appendNodeToGraph(graph *designerGraph, req CreateTaskFromConsoleRequest, instanceID, normalizedNodeType string, ts int64) string {
-	targetNodeID := fmt.Sprintf("node-%d", ts)
-	if normalizedNodeType == "startEvent" {
-		targetNodeID = fmt.Sprintf("start-%s", instanceID)
+	fromNodeID := ""
+	if req.FromNodeID != nil {
+		fromNodeID = strings.TrimSpace(*req.FromNodeID)
+	}
+	triageColor := ""
+	if req.TriageColor != nil {
+		triageColor = strings.TrimSpace(*req.TriageColor)
+	}
+	conditionExpression := ""
+	if req.ConditionExpression != nil {
+		conditionExpression = strings.TrimSpace(*req.ConditionExpression)
+	}
+	correlationKey := ""
+	if req.CorrelationKey != nil {
+		correlationKey = strings.TrimSpace(*req.CorrelationKey)
 	}
 
-	instanceNodes := make([]map[string]any, 0)
-	startNodeID := ""
-	hasNonStartNode := false
-	for _, node := range graph.Nodes {
-		if nodeInstanceID(node) == instanceID {
-			instanceNodes = append(instanceNodes, node)
-			nodeType, _ := node["type"].(string)
-			nodeID, _ := node["id"].(string)
-			if nodeType == "startEvent" {
-				startNodeID = nodeID
-			} else {
-				hasNonStartNode = true
-			}
-		}
+	mutableGraph := taskcreation.DesignerGraph{
+		Nodes: graph.Nodes,
+		Edges: graph.Edges,
 	}
-
-	instanceHasNode := len(instanceNodes) > 0
-	if !instanceHasNode && normalizedNodeType != "startEvent" {
-		startNodeID = fmt.Sprintf("start-%s", instanceID)
-		startNode := map[string]any{
-			"id":     startNodeID,
-			"type":   "startEvent",
-			"width":  40,
-			"height": 40,
-			"style": map[string]any{
-				"width":  40,
-				"height": 40,
-			},
-			"position": map[string]any{"x": 80, "y": 200},
-			"data": map[string]any{
-				"label":      "Start",
-				"instanceId": instanceID,
-			},
-		}
-		graph.Nodes = append(graph.Nodes, startNode)
-		instanceNodes = append(instanceNodes, startNode)
-	}
-
-	reusedNode := false
-	if normalizedNodeType == "userTask" {
-		if existingID, ok := findUserTaskNodeForRole(instanceNodes, req.AssignedRole); ok {
-			targetNodeID = existingID
-			reusedNode = true
-		}
-	}
-
-	if !reusedNode {
-		sourceID := ""
-		if req.FromNodeID != nil && strings.TrimSpace(*req.FromNodeID) != "" {
-			sourceID = strings.TrimSpace(*req.FromNodeID)
-		}
-		sourceNode := findNodeByID(instanceNodes, sourceID)
-		outgoingCountFromSource := countOutgoingEdges(graph.Edges, sourceID)
-		x, y, width, height := computeNodePlacement(instanceNodes, sourceNode, outgoingCountFromSource, normalizedNodeType)
-
-		newNode := map[string]any{
-			"id":   targetNodeID,
-			"type": normalizedNodeType,
-			"position": map[string]any{
-				"x": x,
-				"y": y,
-			},
-			"width":  width,
-			"height": height,
-			"style": map[string]any{
-				"width":  width,
-				"height": height,
-			},
-			"data": map[string]any{
-				"label":      req.Label,
-				"instanceId": instanceID,
-				"role":       roleLabel(req.AssignedRole),
-			},
-		}
-		if normalizedNodeType == "userTask" {
-			newNode["data"].(map[string]any)["taskStatus"] = "pending"
-		}
-		if req.AssignedRole != "admin" {
-			newNode["data"].(map[string]any)["laneRef"] = string(req.AssignedRole)
-		}
-		if req.TriageColor != nil && strings.TrimSpace(*req.TriageColor) != "" {
-			newNode["data"].(map[string]any)["triageColor"] = strings.TrimSpace(*req.TriageColor)
-		}
-		if req.ConditionExpression != nil && strings.TrimSpace(*req.ConditionExpression) != "" {
-			newNode["data"].(map[string]any)["conditionExpression"] = strings.TrimSpace(*req.ConditionExpression)
-		}
-		if req.CorrelationKey != nil && strings.TrimSpace(*req.CorrelationKey) != "" {
-			newNode["data"].(map[string]any)["correlationKey"] = strings.TrimSpace(*req.CorrelationKey)
-		}
-
-		graph.Nodes = append(graph.Nodes, newNode)
-		instanceNodes = append(instanceNodes, newNode)
-	} else {
-		existingNode := findNodeByID(instanceNodes, targetNodeID)
-		if existingNode != nil {
-			data, _ := existingNode["data"].(map[string]any)
-			if data == nil {
-				data = map[string]any{}
-				existingNode["data"] = data
-			}
-			data["instanceId"] = instanceID
-			data["role"] = roleLabel(req.AssignedRole)
-			if strings.TrimSpace(req.Label) != "" {
-				data["label"] = req.Label
-			}
-			if req.AssignedRole != "admin" {
-				data["laneRef"] = string(req.AssignedRole)
-			}
-			if req.TriageColor != nil && strings.TrimSpace(*req.TriageColor) != "" {
-				data["triageColor"] = strings.TrimSpace(*req.TriageColor)
-			}
-		}
-	}
-
-	sourceID := ""
-	if req.FromNodeID != nil && strings.TrimSpace(*req.FromNodeID) != "" {
-		sourceID = strings.TrimSpace(*req.FromNodeID)
-	} else if !hasNonStartNode && normalizedNodeType != "startEvent" {
-		// First created task in an instance must be connected to Start.
-		sourceID = startNodeID
-	}
-	if sourceID == "" || sourceID == targetNodeID || edgeExists(graph.Edges, sourceID, targetNodeID) {
-		return targetNodeID
-	}
-
-	sourceNode := findNodeByID(instanceNodes, sourceID)
-	outgoingCountFromSource := countOutgoingEdges(graph.Edges, sourceID)
-	edge := map[string]any{
-		"id":     fmt.Sprintf("edge-%d", ts),
-		"source": sourceID,
-		"target": targetNodeID,
-		"type":   "sequenceFlow",
-		"markerEnd": map[string]any{
-			"type": "arrowclosed",
-		},
-		"style": map[string]any{"stroke": "hsl(220,68%,30%)"},
-	}
-	if sourceNode != nil {
-		sourceType, _ := sourceNode["type"].(string)
-		if sourceType == "andGateway" {
-			if outgoingCountFromSource%2 == 0 {
-				edge["sourceHandle"] = "top"
-			} else {
-				edge["sourceHandle"] = "bottom"
-			}
-			edge["label"] = fmt.Sprintf("Branch %c", 'A'+rune(outgoingCountFromSource))
-		}
-	}
-	if req.ConditionExpression != nil && strings.TrimSpace(*req.ConditionExpression) != "" {
-		edge["label"] = strings.TrimSpace(*req.ConditionExpression)
-	}
-	graph.Edges = append(graph.Edges, edge)
-
+	targetNodeID := taskcreation.AppendNodeToGraph(&mutableGraph, taskcreation.AppendNodeRequest{
+		InstanceID:          instanceID,
+		NormalizedNodeType:  normalizedNodeType,
+		Label:               req.Label,
+		AssignedRole:        string(req.AssignedRole),
+		FromNodeID:          fromNodeID,
+		TriageColor:         triageColor,
+		ConditionExpression: conditionExpression,
+		CorrelationKey:      correlationKey,
+		TimestampMillis:     ts,
+		AssignedRoleLabel:   roleLabel(req.AssignedRole),
+	})
+	graph.Nodes = mutableGraph.Nodes
+	graph.Edges = mutableGraph.Edges
 	return targetNodeID
-}
-
-func findUserTaskNodeForRole(nodes []map[string]any, role Role) (string, bool) {
-	for _, node := range nodes {
-		nodeType, _ := node["type"].(string)
-		if nodeType != "userTask" {
-			continue
-		}
-		data, _ := node["data"].(map[string]any)
-		if data == nil {
-			continue
-		}
-		laneRef, _ := data["laneRef"].(string)
-		roleLabelValue, _ := data["role"].(string)
-		if laneRef == string(role) || strings.EqualFold(roleLabelValue, roleLabel(role)) {
-			nodeID, _ := node["id"].(string)
-			if nodeID != "" {
-				return nodeID, true
-			}
-		}
-	}
-	return "", false
-}
-
-func findNodeByID(nodes []map[string]any, id string) map[string]any {
-	if strings.TrimSpace(id) == "" {
-		return nil
-	}
-	for _, node := range nodes {
-		nodeID, _ := node["id"].(string)
-		if nodeID == id {
-			return node
-		}
-	}
-	return nil
-}
-
-func countOutgoingEdges(edges []map[string]any, sourceID string) int {
-	if strings.TrimSpace(sourceID) == "" {
-		return 0
-	}
-	count := 0
-	for _, edge := range edges {
-		source, _ := edge["source"].(string)
-		if source == sourceID {
-			count++
-		}
-	}
-	return count
-}
-
-func edgeExists(edges []map[string]any, sourceID, targetID string) bool {
-	for _, edge := range edges {
-		source, _ := edge["source"].(string)
-		target, _ := edge["target"].(string)
-		if source == sourceID && target == targetID {
-			return true
-		}
-	}
-	return false
-}
-
-func computeNodePlacement(instanceNodes []map[string]any, sourceNode map[string]any, sourceOutgoing int, nodeType string) (int, int, int, int) {
-	width, height := nodeSize(nodeType)
-	x := 220
-	y := 180
-
-	if sourceNode != nil {
-		sourcePos, _ := sourceNode["position"].(map[string]any)
-		sourceX, _ := numberAsInt(sourcePos["x"])
-		sourceY, _ := numberAsInt(sourcePos["y"])
-		sourceWidth, _ := numberAsInt(sourceNode["width"])
-		if sourceWidth == 0 {
-			if style, ok := sourceNode["style"].(map[string]any); ok {
-				sourceWidth, _ = numberAsInt(style["width"])
-			}
-		}
-		if sourceWidth == 0 {
-			sourceWidth = 120
-		}
-		x = sourceX + sourceWidth + 140
-		y = sourceY
-
-		sourceType, _ := sourceNode["type"].(string)
-		if sourceType == "andGateway" || sourceType == "xorGateway" {
-			y = sourceY + branchOffset(sourceOutgoing)
-		}
-	}
-
-	for overlapsPlacement(instanceNodes, x, y, width, height) {
-		y += 140
-	}
-
-	return x, y, width, height
-}
-
-func nodeSize(nodeType string) (int, int) {
-	switch nodeType {
-	case "xorGateway", "andGateway":
-		return 64, 64
-	case "startEvent", "endEvent", "timerEvent", "messageEvent", "signalEvent":
-		return 40, 40
-	default:
-		return 220, 110
-	}
-}
-
-func branchOffset(index int) int {
-	if index == 0 {
-		return -170
-	}
-	if index == 1 {
-		return 170
-	}
-	level := ((index - 2) / 2) + 2
-	if index%2 == 0 {
-		return -170 * level
-	}
-	return 170 * level
-}
-
-func overlapsPlacement(nodes []map[string]any, x, y, width, height int) bool {
-	for _, node := range nodes {
-		pos, _ := node["position"].(map[string]any)
-		nodeX, _ := numberAsInt(pos["x"])
-		nodeY, _ := numberAsInt(pos["y"])
-		nodeW, _ := numberAsInt(node["width"])
-		nodeH, _ := numberAsInt(node["height"])
-		if nodeW == 0 || nodeH == 0 {
-			style, _ := node["style"].(map[string]any)
-			if nodeW == 0 {
-				nodeW, _ = numberAsInt(style["width"])
-			}
-			if nodeH == 0 {
-				nodeH, _ = numberAsInt(style["height"])
-			}
-		}
-		if nodeW == 0 {
-			nodeW = 80
-		}
-		if nodeH == 0 {
-			nodeH = 80
-		}
-
-		if x+width+36 < nodeX || nodeX+nodeW+36 < x || y+height+28 < nodeY || nodeY+nodeH+28 < y {
-			continue
-		}
-		return true
-	}
-	return false
-}
-
-func numberAsInt(value any) (int, bool) {
-	switch typed := value.(type) {
-	case int:
-		return typed, true
-	case int32:
-		return int(typed), true
-	case int64:
-		return int(typed), true
-	case float64:
-		return int(typed), true
-	case float32:
-		return int(typed), true
-	default:
-		return 0, false
-	}
 }
 
 func (c *Client) upsertDefinitionGraph(ctx context.Context, tx pgx.Tx, definitionID string, graph designerGraph) error {
@@ -697,18 +408,6 @@ func triageMeta(color string) (priority string, category string, slaMinutes int)
 	default:
 		return "medium", "urgent", 30
 	}
-}
-
-func nodeInstanceID(node map[string]any) string {
-	data, ok := node["data"].(map[string]any)
-	if !ok {
-		return ""
-	}
-	value, ok := data["instanceId"].(string)
-	if !ok {
-		return ""
-	}
-	return value
 }
 
 func defaultTaskFormFields(role Role) json.RawMessage {

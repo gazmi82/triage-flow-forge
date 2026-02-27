@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 )
 
@@ -124,6 +125,134 @@ LIMIT 1
 	if graph.Edges == nil {
 		graph.Edges = []map[string]any{}
 	}
+	graph, err = c.hydrateBootstrapGraphRuntime(ctx, graph)
+	if err != nil {
+		return DesignerGraphPayload{}, err
+	}
+	return graph, nil
+}
+
+type taskRuntimeSnapshot struct {
+	InstanceID  string
+	NodeID      string
+	Status      string
+	TriageColor string
+	UpdatedAt   time.Time
+}
+
+func (c *Client) hydrateBootstrapGraphRuntime(ctx context.Context, graph DesignerGraphPayload) (DesignerGraphPayload, error) {
+	pool, err := c.ensurePool(ctx)
+	if err != nil {
+		return graph, err
+	}
+
+	rows, err := pool.Query(ctx, `
+SELECT instance_id, COALESCE(node_id, ''), status, COALESCE(triage_color, ''), updated_at
+FROM tasks
+WHERE COALESCE(node_id, '') <> ''
+ORDER BY updated_at DESC
+`)
+	if err != nil {
+		return graph, err
+	}
+	defer rows.Close()
+
+	latestByInstanceNode := map[string]taskRuntimeSnapshot{}
+	for rows.Next() {
+		var item taskRuntimeSnapshot
+		if err := rows.Scan(&item.InstanceID, &item.NodeID, &item.Status, &item.TriageColor, &item.UpdatedAt); err != nil {
+			return graph, err
+		}
+		key := item.InstanceID + "::" + item.NodeID
+		if _, exists := latestByInstanceNode[key]; !exists {
+			latestByInstanceNode[key] = item
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return graph, err
+	}
+
+	nodesByInstance := map[string][]map[string]any{}
+	startByInstance := map[string]string{}
+	for _, node := range graph.Nodes {
+		nodeType, _ := node["type"].(string)
+		nodeID, _ := node["id"].(string)
+		data, _ := node["data"].(map[string]any)
+		if data == nil {
+			continue
+		}
+		instanceID, _ := data["instanceId"].(string)
+		if instanceID == "" {
+			continue
+		}
+		nodesByInstance[instanceID] = append(nodesByInstance[instanceID], node)
+
+		if nodeType == "userTask" && nodeID != "" {
+			key := instanceID + "::" + nodeID
+			if task, ok := latestByInstanceNode[key]; ok {
+				data["taskStatus"] = normalizeDesignerTaskStatus(task.Status)
+				data["runtimeActive"] = task.Status == "claimed"
+				if task.TriageColor != "" {
+					data["triageColor"] = task.TriageColor
+				}
+			}
+		}
+		if nodeType == "startEvent" && nodeID != "" {
+			startByInstance[instanceID] = nodeID
+		}
+	}
+
+	// Ensure each instance has a Start -> first node edge if missing.
+	for instanceID, nodes := range nodesByInstance {
+		startID := startByInstance[instanceID]
+		if startID == "" {
+			continue
+		}
+		hasStartOutgoing := false
+		for _, edge := range graph.Edges {
+			source, _ := edge["source"].(string)
+			if source == startID {
+				hasStartOutgoing = true
+				break
+			}
+		}
+		if hasStartOutgoing {
+			continue
+		}
+
+		var firstNodeID string
+		var firstX float64
+		firstSet := false
+		for _, node := range nodes {
+			nodeType, _ := node["type"].(string)
+			nodeID, _ := node["id"].(string)
+			if nodeID == "" || nodeID == startID || nodeType == "startEvent" {
+				continue
+			}
+			pos, _ := node["position"].(map[string]any)
+			x, ok := numberAsFloat(pos["x"])
+			if !ok {
+				continue
+			}
+			if !firstSet || x < firstX {
+				firstSet = true
+				firstX = x
+				firstNodeID = nodeID
+			}
+		}
+		if firstNodeID == "" || edgeExists(graph.Edges, startID, firstNodeID) {
+			continue
+		}
+		graph.Edges = append(graph.Edges, map[string]any{
+			"id":        fmt.Sprintf("edge-%s-%s", startID, firstNodeID),
+			"source":    startID,
+			"target":    firstNodeID,
+			"type":      "sequenceFlow",
+			"markerEnd": map[string]any{"type": "arrowclosed"},
+			"style":     map[string]any{"stroke": "hsl(220,68%,30%)"},
+		})
+	}
+
 	return graph, nil
 }
 

@@ -196,7 +196,7 @@ export function TaskForm({ task, selectedNodeType, onComplete, onSave }: TaskFor
         });
         return;
       }
-    } else if (selectedNodeType !== "xorGateway" && !effectiveRedirectRole) {
+    } else if (selectedNodeType !== "xorGateway" && selectedNodeType !== "endEvent" && !effectiveRedirectRole) {
       toast({
         title: "Redirect role required",
         description: "Select the next role before completing the task.",
@@ -368,7 +368,7 @@ export function TaskForm({ task, selectedNodeType, onComplete, onSave }: TaskFor
         onCorrelationKeyChange={setCorrelationKey}
       />
 
-      {selectedNodeType !== "xorGateway" && selectedNodeType !== "andGateway" && (
+      {selectedNodeType !== "xorGateway" && selectedNodeType !== "andGateway" && selectedNodeType !== "endEvent" && (
       <div className="space-y-2 rounded-md border border-border bg-card p-2.5">
         <button
           type="button"

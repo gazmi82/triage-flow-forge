@@ -240,6 +240,44 @@ func enrichGraphForTaskRuntime(graph DesignerGraphPayload, instanceID string, ta
 		data["runtimeActive"] = task.Status == "claimed"
 	}
 
+	// Ensure Start is connected to the first task for this instance.
+	firstTaskNodeID := ""
+	for _, task := range tasks {
+		if strings.TrimSpace(task.NodeID) != "" {
+			firstTaskNodeID = strings.TrimSpace(task.NodeID)
+			break
+		}
+	}
+	if firstTaskNodeID == "" {
+		minX := 1e12
+		for _, node := range graph.Nodes {
+			nodeID, _ := node["id"].(string)
+			if nodeID == "" || nodeID == startID {
+				continue
+			}
+			nodeType, _ := node["type"].(string)
+			if nodeType == "startEvent" {
+				continue
+			}
+			pos, _ := node["position"].(map[string]any)
+			x, ok := numberAsFloat(pos["x"])
+			if ok && x < minX {
+				minX = x
+				firstTaskNodeID = nodeID
+			}
+		}
+	}
+	if firstTaskNodeID != "" && !edgeExists(graph.Edges, startID, firstTaskNodeID) {
+		graph.Edges = append(graph.Edges, map[string]any{
+			"id":        fmt.Sprintf("edge-%s-%s", startID, firstTaskNodeID),
+			"source":    startID,
+			"target":    firstTaskNodeID,
+			"type":      "sequenceFlow",
+			"markerEnd": map[string]any{"type": "arrowclosed"},
+			"style":     map[string]any{"stroke": "hsl(220,68%,30%)"},
+		})
+	}
+
 	return graph
 }
 
@@ -267,4 +305,15 @@ func numberAsFloat(value any) (float64, bool) {
 	default:
 		return 0, false
 	}
+}
+
+func edgeExists(edges []map[string]any, sourceID, targetID string) bool {
+	for _, edge := range edges {
+		source, _ := edge["source"].(string)
+		target, _ := edge["target"].(string)
+		if source == sourceID && target == targetID {
+			return true
+		}
+	}
+	return false
 }
