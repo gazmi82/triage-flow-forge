@@ -1,6 +1,12 @@
 package taskcreation
 
-import "strings"
+import (
+	"sort"
+	"strconv"
+	"strings"
+)
+
+const taskSidePortCount = 5
 
 func findNodeByID(nodes []map[string]any, id string) map[string]any {
 	if strings.TrimSpace(id) == "" {
@@ -29,13 +35,116 @@ func countOutgoingEdges(edges []map[string]any, sourceID string) int {
 	return count
 }
 
-func countIncomingByTargetHandle(edges []map[string]any, targetID string) map[string]int {
-	counts := map[string]int{
-		"left":   0,
-		"right":  0,
-		"top":    0,
-		"bottom": 0,
+func NormalizeInstanceRouting(graph *DesignerGraph, instanceID string) {
+	if graph == nil || strings.TrimSpace(instanceID) == "" {
+		return
 	}
+
+	instanceNodes := make([]map[string]any, 0)
+	nodeByID := make(map[string]map[string]any)
+	for _, node := range graph.Nodes {
+		if nodeInstanceID(node) != instanceID {
+			continue
+		}
+		nodeID, _ := node["id"].(string)
+		if nodeID == "" {
+			continue
+		}
+		instanceNodes = append(instanceNodes, node)
+		nodeByID[nodeID] = node
+	}
+	if len(instanceNodes) == 0 {
+		return
+	}
+
+	instanceEdgeIdx := make([]int, 0)
+	for i, edge := range graph.Edges {
+		sourceID, _ := edge["source"].(string)
+		targetID, _ := edge["target"].(string)
+		if sourceID == "" || targetID == "" {
+			continue
+		}
+		if nodeByID[sourceID] != nil && nodeByID[targetID] != nil {
+			instanceEdgeIdx = append(instanceEdgeIdx, i)
+		}
+	}
+	if len(instanceEdgeIdx) == 0 {
+		return
+	}
+
+	sort.Slice(instanceEdgeIdx, func(i, j int) bool {
+		a := graph.Edges[instanceEdgeIdx[i]]
+		b := graph.Edges[instanceEdgeIdx[j]]
+		as, _ := a["source"].(string)
+		at, _ := a["target"].(string)
+		bs, _ := b["source"].(string)
+		bt, _ := b["target"].(string)
+
+		asx, asy := nodeCenter(nodeByID[as])
+		atx, aty := nodeCenter(nodeByID[at])
+		bsx, bsy := nodeCenter(nodeByID[bs])
+		btx, bty := nodeCenter(nodeByID[bt])
+
+		if asx != bsx {
+			return asx < bsx
+		}
+		if asy != bsy {
+			return asy < bsy
+		}
+		if atx != btx {
+			return atx < btx
+		}
+		if aty != bty {
+			return aty < bty
+		}
+		aid, _ := a["id"].(string)
+		bid, _ := b["id"].(string)
+		return aid < bid
+	})
+
+	committed := make([]map[string]any, 0, len(instanceEdgeIdx))
+	for _, idx := range instanceEdgeIdx {
+		edge := graph.Edges[idx]
+		sourceID, _ := edge["source"].(string)
+		targetID, _ := edge["target"].(string)
+		sourceNode := nodeByID[sourceID]
+		targetNode := nodeByID[targetID]
+		if sourceNode == nil || targetNode == nil {
+			continue
+		}
+
+		sourceOutgoing := countOutgoingEdges(committed, sourceID)
+		outgoingByHandle := countOutgoingBySourceHandle(committed, sourceID)
+		incomingByHandle := countIncomingByTargetHandle(committed, targetID)
+
+		sourceHandle, targetHandle := chooseEdgeHandles(
+			sourceNode,
+			targetNode,
+			sourceOutgoing,
+			outgoingByHandle,
+			incomingByHandle,
+			committed,
+			instanceNodes,
+			sourceID,
+			targetID,
+		)
+
+		if sourceHandle == "" {
+			delete(edge, "sourceHandle")
+		} else {
+			edge["sourceHandle"] = sourceHandle
+		}
+		if targetHandle == "" {
+			delete(edge, "targetHandle")
+		} else {
+			edge["targetHandle"] = targetHandle
+		}
+		committed = append(committed, edge)
+	}
+}
+
+func countIncomingByTargetHandle(edges []map[string]any, targetID string) map[string]int {
+	counts := map[string]int{}
 	for _, edge := range edges {
 		target, _ := edge["target"].(string)
 		if target != targetID {
@@ -51,12 +160,7 @@ func countIncomingByTargetHandle(edges []map[string]any, targetID string) map[st
 }
 
 func countOutgoingBySourceHandle(edges []map[string]any, sourceID string) map[string]int {
-	counts := map[string]int{
-		"left":   0,
-		"right":  0,
-		"top":    0,
-		"bottom": 0,
-	}
+	counts := map[string]int{}
 	for _, edge := range edges {
 		source, _ := edge["source"].(string)
 		if source != sourceID {
@@ -99,16 +203,26 @@ func chooseEdgeHandles(
 	allowedTarget := allowedTargetHandles(targetType)
 	allowedSource := allowedSourceHandles(sourceType)
 
-	candidateSources := []string{preferredSource, "right", "left", "top", "bottom"}
-	candidateTargets := []string{preferredTarget, "left", "right", "top", "bottom"}
+	candidateSources := expandSidesToHandles(
+		sourceNode,
+		sourceType,
+		[]string{preferredSource, "right", "left", "top", "bottom"},
+		point{x: targetX, y: targetY},
+	)
+	candidateTargets := expandSidesToHandles(
+		targetNode,
+		targetType,
+		[]string{preferredTarget, "left", "right", "top", "bottom"},
+		point{x: sourceX, y: sourceY},
+	)
 
 	if sourceType == "andGateway" {
 		if sourceOutgoing%2 == 0 {
-			candidateSources = []string{"top"}
-			candidateTargets = []string{"top", "left", "right", "bottom"}
+			candidateSources = expandSidesToHandles(sourceNode, sourceType, []string{"top"}, point{x: targetX, y: targetY})
+			candidateTargets = expandSidesToHandles(targetNode, targetType, []string{"top", "left", "right", "bottom"}, point{x: sourceX, y: sourceY})
 		} else {
-			candidateSources = []string{"bottom"}
-			candidateTargets = []string{"bottom", "left", "right", "top"}
+			candidateSources = expandSidesToHandles(sourceNode, sourceType, []string{"bottom"}, point{x: targetX, y: targetY})
+			candidateTargets = expandSidesToHandles(targetNode, targetType, []string{"bottom", "left", "right", "top"}, point{x: sourceX, y: sourceY})
 		}
 	}
 
@@ -129,33 +243,34 @@ func chooseEdgeHandles(
 			if !containsHandle(allowedTarget, targetHandle) {
 				continue
 			}
-			variants := buildRouteVariants(sourceNode, sourceHandle, targetNode, targetHandle, absInt(dx) >= absInt(dy))
-			for _, route := range variants {
-				crossings := countCrossings(route, existingSegments)
-				nodeHits := countNodeHits(route, nodes, sourceID, targetID)
-				length := routeLength(route)
-				penalty := 0
-				if sourceHandle != preferredSource {
-					penalty += 20
-				}
-				if targetHandle != preferredTarget {
-					penalty += 20
-				}
-				penalty += outgoingSourceHandles[sourceHandle] * 8
-				penalty += incomingTargetHandles[targetHandle] * 4
+			route := buildOrthogonalRoute(sourceNode, sourceHandle, targetNode, targetHandle, absInt(dx) >= absInt(dy))
+			if len(route) == 0 {
+				continue
+			}
+			crossings := countCrossings(route, existingSegments)
+			nodeHits := countNodeHits(route, nodes, sourceID, targetID)
+			length := routeLength(route)
+			penalty := 0
+			if sourceHandle != preferredSource {
+				penalty += 20
+			}
+			if targetHandle != preferredTarget {
+				penalty += 20
+			}
+			penalty += outgoingSourceHandles[sourceHandle] * 8
+			penalty += incomingTargetHandles[targetHandle] * 4
 
-				// Priority: 1) no crossing / no shared corridor, 2) avoid node overlaps, 3) shortest path.
-				if crossings < bestCross ||
-					(crossings == bestCross && nodeHits < bestNodeHits) ||
-					(crossings == bestCross && nodeHits == bestNodeHits && length < bestLen) ||
-					(crossings == bestCross && nodeHits == bestNodeHits && length == bestLen && penalty < bestPenalty) {
-					bestCross = crossings
-					bestNodeHits = nodeHits
-					bestLen = length
-					bestPenalty = penalty
-					bestSource = sourceHandle
-					bestTarget = targetHandle
-				}
+			// Priority: 1) no crossing / no shared corridor, 2) avoid node overlaps, 3) shortest path.
+			if crossings < bestCross ||
+				(crossings == bestCross && nodeHits < bestNodeHits) ||
+				(crossings == bestCross && nodeHits == bestNodeHits && length < bestLen) ||
+				(crossings == bestCross && nodeHits == bestNodeHits && length == bestLen && penalty < bestPenalty) {
+				bestCross = crossings
+				bestNodeHits = nodeHits
+				bestLen = length
+				bestPenalty = penalty
+				bestSource = sourceHandle
+				bestTarget = targetHandle
 			}
 		}
 	}
@@ -316,7 +431,9 @@ func absInt(value int) int {
 
 func allowedTargetHandles(nodeType string) []string {
 	switch nodeType {
-	case "userTask", "xorGateway", "andGateway":
+	case "userTask":
+		return allTaskHandleIDs()
+	case "xorGateway", "andGateway":
 		return []string{"left", "right", "top", "bottom"}
 	default:
 		return []string{"left"}
@@ -325,11 +442,24 @@ func allowedTargetHandles(nodeType string) []string {
 
 func allowedSourceHandles(nodeType string) []string {
 	switch nodeType {
-	case "userTask", "xorGateway", "andGateway":
+	case "userTask":
+		return allTaskHandleIDs()
+	case "xorGateway", "andGateway":
 		return []string{"right", "left", "top", "bottom"}
 	default:
 		return []string{"right"}
 	}
+}
+
+func allTaskHandleIDs() []string {
+	ids := make([]string, 0, 4*(taskSidePortCount+1))
+	for _, side := range []string{"right", "left", "top", "bottom"} {
+		ids = append(ids, side)
+		for i := 1; i <= taskSidePortCount; i++ {
+			ids = append(ids, side+"-"+strconv.Itoa(i))
+		}
+	}
+	return ids
 }
 
 func clampHandle(handle string, allowed []string, fallback string) string {
@@ -352,6 +482,128 @@ func containsHandle(list []string, value string) bool {
 		}
 	}
 	return false
+}
+
+func dedupeStrings(values []string) []string {
+	seen := make(map[string]struct{}, len(values))
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		if strings.TrimSpace(value) == "" {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
+	}
+	return out
+}
+
+func expandSidesToHandles(node map[string]any, nodeType string, sides []string, toward point) []string {
+	if nodeType != "userTask" {
+		return dedupeStrings(sides)
+	}
+	expanded := make([]string, 0, len(sides)*(taskSidePortCount+1))
+	for _, side := range sides {
+		expanded = append(expanded, taskHandlesForSide(node, side, toward)...)
+	}
+	return dedupeStrings(expanded)
+}
+
+func taskHandlesForSide(node map[string]any, side string, toward point) []string {
+	side = handleBase(side)
+	if side != "left" && side != "right" && side != "top" && side != "bottom" {
+		return nil
+	}
+	if node == nil {
+		return []string{side}
+	}
+
+	x, y, w, h := nodeRect(node)
+	ordered := make([]int, 0, taskSidePortCount)
+	type slotDistance struct {
+		slot int
+		dist int
+	}
+	slotDistances := make([]slotDistance, 0, taskSidePortCount)
+	for i := 1; i <= taskSidePortCount; i++ {
+		if side == "left" || side == "right" {
+			slotY := y + (h*i)/(taskSidePortCount+1)
+			slotDistances = append(slotDistances, slotDistance{slot: i, dist: absInt(slotY - toward.y)})
+		} else {
+			slotX := x + (w*i)/(taskSidePortCount+1)
+			slotDistances = append(slotDistances, slotDistance{slot: i, dist: absInt(slotX - toward.x)})
+		}
+	}
+	sort.Slice(slotDistances, func(i, j int) bool {
+		if slotDistances[i].dist != slotDistances[j].dist {
+			return slotDistances[i].dist < slotDistances[j].dist
+		}
+		return slotDistances[i].slot < slotDistances[j].slot
+	})
+	for _, item := range slotDistances {
+		ordered = append(ordered, item.slot)
+	}
+
+	handles := make([]string, 0, taskSidePortCount+1)
+	for _, slot := range ordered {
+		handles = append(handles, side+"-"+strconv.Itoa(slot))
+	}
+	// Keep legacy center handle compatibility for old edges.
+	handles = append(handles, side)
+	return handles
+}
+
+func handleBase(handle string) string {
+	handle = strings.TrimSpace(handle)
+	if handle == "" {
+		return ""
+	}
+	if idx := strings.Index(handle, "-"); idx > 0 {
+		return handle[:idx]
+	}
+	return handle
+}
+
+func handleSlot(handle string) int {
+	handle = strings.TrimSpace(handle)
+	idx := strings.Index(handle, "-")
+	if idx < 0 || idx >= len(handle)-1 {
+		return 0
+	}
+	slot, err := strconv.Atoi(handle[idx+1:])
+	if err != nil || slot < 1 {
+		return 0
+	}
+	if slot > taskSidePortCount {
+		return taskSidePortCount
+	}
+	return slot
+}
+
+func nodeRect(node map[string]any) (int, int, int, int) {
+	pos, _ := node["position"].(map[string]any)
+	x, _ := numberAsInt(pos["x"])
+	y, _ := numberAsInt(pos["y"])
+	w, _ := numberAsInt(node["width"])
+	h, _ := numberAsInt(node["height"])
+	if w == 0 || h == 0 {
+		style, _ := node["style"].(map[string]any)
+		if w == 0 {
+			w, _ = numberAsInt(style["width"])
+		}
+		if h == 0 {
+			h, _ = numberAsInt(style["height"])
+		}
+	}
+	if w == 0 {
+		w = 80
+	}
+	if h == 0 {
+		h = 80
+	}
+	return x, y, w, h
 }
 
 type point struct {
@@ -442,92 +694,38 @@ func buildOrthogonalRoute(sourceNode map[string]any, sourceHandle string, target
 	return segments
 }
 
-func buildRouteVariants(sourceNode map[string]any, sourceHandle string, targetNode map[string]any, targetHandle string, preferHorizontal bool) [][]segment {
-	variants := make([][]segment, 0, 10)
-	// Base shortest route.
-	variants = append(variants, buildOrthogonalRoute(sourceNode, sourceHandle, targetNode, targetHandle, preferHorizontal))
-
-	// Conditional expansions in both directions (horizontal and vertical).
-	if preferHorizontal {
-		for _, delta := range []int{60, -60, 120, -120, 180, -180, 260, -260, 360, -360, 520, -520} {
-			variants = append(variants, buildDetourRoute(sourceNode, sourceHandle, targetNode, targetHandle, true, delta))
-		}
-		for _, delta := range []int{80, -80, 160, -160, 240, -240, 320, -320, 480, -480} {
-			variants = append(variants, buildDetourRoute(sourceNode, sourceHandle, targetNode, targetHandle, false, delta))
-		}
-	} else {
-		for _, delta := range []int{60, -60, 120, -120, 180, -180, 260, -260, 360, -360, 520, -520} {
-			variants = append(variants, buildDetourRoute(sourceNode, sourceHandle, targetNode, targetHandle, false, delta))
-		}
-		for _, delta := range []int{80, -80, 160, -160, 240, -240, 320, -320, 480, -480} {
-			variants = append(variants, buildDetourRoute(sourceNode, sourceHandle, targetNode, targetHandle, true, delta))
-		}
-	}
-	return variants
-}
-
-func buildDetourRoute(sourceNode map[string]any, sourceHandle string, targetNode map[string]any, targetHandle string, detourOnY bool, detour int) []segment {
-	start := handlePoint(sourceNode, sourceHandle)
-	end := handlePoint(targetNode, targetHandle)
-	if start == end {
-		return nil
-	}
-
-	const offset = 42
-	outStart := moveFromHandle(start, sourceHandle, offset)
-	preEnd := moveFromHandle(end, targetHandle, offset)
-
-	points := []point{start, outStart}
-	if detourOnY {
-		dy := outStart.y + detour
-		points = append(points, point{x: outStart.x, y: dy}, point{x: preEnd.x, y: dy}, point{x: preEnd.x, y: preEnd.y})
-	} else {
-		dx := outStart.x + detour
-		points = append(points, point{x: dx, y: outStart.y}, point{x: dx, y: preEnd.y}, point{x: preEnd.x, y: preEnd.y})
-	}
-	points = append(points, end)
-
-	segments := make([]segment, 0, len(points)-1)
-	for i := 0; i < len(points)-1; i++ {
-		if points[i] == points[i+1] {
-			continue
-		}
-		segments = append(segments, segment{a: points[i], b: points[i+1]})
-	}
-	return segments
-}
-
 func handlePoint(node map[string]any, handle string) point {
-	pos, _ := node["position"].(map[string]any)
-	x, _ := numberAsInt(pos["x"])
-	y, _ := numberAsInt(pos["y"])
-	w, _ := numberAsInt(node["width"])
-	h, _ := numberAsInt(node["height"])
-	if w == 0 || h == 0 {
-		style, _ := node["style"].(map[string]any)
-		if w == 0 {
-			w, _ = numberAsInt(style["width"])
-		}
-		if h == 0 {
-			h, _ = numberAsInt(style["height"])
+	x, y, w, h := nodeRect(node)
+	side := handleBase(handle)
+	slot := handleSlot(handle)
+
+	midY := y + (h / 2)
+	midX := x + (w / 2)
+	if slot > 0 {
+		switch side {
+		case "left", "right":
+			midY = y + (h*slot)/(taskSidePortCount+1)
+		case "top", "bottom":
+			midX = x + (w*slot)/(taskSidePortCount+1)
 		}
 	}
-	switch handle {
+
+	switch side {
 	case "left":
-		return point{x: x, y: y + (h / 2)}
+		return point{x: x, y: midY}
 	case "right":
-		return point{x: x + w, y: y + (h / 2)}
+		return point{x: x + w, y: midY}
 	case "top":
-		return point{x: x + (w / 2), y: y}
+		return point{x: midX, y: y}
 	case "bottom":
-		return point{x: x + (w / 2), y: y + h}
+		return point{x: midX, y: y + h}
 	default:
 		return point{x: x + w, y: y + (h / 2)}
 	}
 }
 
 func moveFromHandle(p point, handle string, distance int) point {
-	switch handle {
+	switch handleBase(handle) {
 	case "left":
 		return point{x: p.x - distance, y: p.y}
 	case "right":

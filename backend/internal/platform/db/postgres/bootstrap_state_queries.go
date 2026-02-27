@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"time"
+
+	"triage-flow-forge/backend/internal/platform/db/postgres/taskcreation"
 )
 
 func (c *Client) fetchSavedTasks(ctx context.Context) ([]SavedTaskRecord, error) {
@@ -216,41 +218,46 @@ ORDER BY updated_at DESC
 				break
 			}
 		}
-		if hasStartOutgoing {
-			continue
+		if !hasStartOutgoing {
+			var firstNodeID string
+			var firstX float64
+			firstSet := false
+			for _, node := range nodes {
+				nodeType, _ := node["type"].(string)
+				nodeID, _ := node["id"].(string)
+				if nodeID == "" || nodeID == startID || nodeType == "startEvent" {
+					continue
+				}
+				pos, _ := node["position"].(map[string]any)
+				x, ok := numberAsFloat(pos["x"])
+				if !ok {
+					continue
+				}
+				if !firstSet || x < firstX {
+					firstSet = true
+					firstX = x
+					firstNodeID = nodeID
+				}
+			}
+			if firstNodeID != "" && !edgeExists(graph.Edges, startID, firstNodeID) {
+				graph.Edges = append(graph.Edges, map[string]any{
+					"id":        fmt.Sprintf("edge-%s-%s", startID, firstNodeID),
+					"source":    startID,
+					"target":    firstNodeID,
+					"type":      "sequenceFlow",
+					"markerEnd": map[string]any{"type": "arrowclosed"},
+					"style":     map[string]any{"stroke": "hsl(220,68%,30%)"},
+				})
+			}
 		}
 
-		var firstNodeID string
-		var firstX float64
-		firstSet := false
-		for _, node := range nodes {
-			nodeType, _ := node["type"].(string)
-			nodeID, _ := node["id"].(string)
-			if nodeID == "" || nodeID == startID || nodeType == "startEvent" {
-				continue
-			}
-			pos, _ := node["position"].(map[string]any)
-			x, ok := numberAsFloat(pos["x"])
-			if !ok {
-				continue
-			}
-			if !firstSet || x < firstX {
-				firstSet = true
-				firstX = x
-				firstNodeID = nodeID
-			}
+		mutableGraph := taskcreation.DesignerGraph{
+			Nodes: graph.Nodes,
+			Edges: graph.Edges,
 		}
-		if firstNodeID == "" || edgeExists(graph.Edges, startID, firstNodeID) {
-			continue
-		}
-		graph.Edges = append(graph.Edges, map[string]any{
-			"id":        fmt.Sprintf("edge-%s-%s", startID, firstNodeID),
-			"source":    startID,
-			"target":    firstNodeID,
-			"type":      "sequenceFlow",
-			"markerEnd": map[string]any{"type": "arrowclosed"},
-			"style":     map[string]any{"stroke": "hsl(220,68%,30%)"},
-		})
+		taskcreation.NormalizeInstanceRouting(&mutableGraph, instanceID)
+		graph.Nodes = mutableGraph.Nodes
+		graph.Edges = mutableGraph.Edges
 	}
 
 	return graph, nil

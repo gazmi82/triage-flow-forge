@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"triage-flow-forge/backend/internal/platform/db/postgres/taskcreation"
 )
 
 func (c *Client) FetchTaskDesignerGraph(ctx context.Context, taskID string) (DesignerGraphPayload, error) {
@@ -44,7 +45,15 @@ WHERE id = $1
 	}
 
 	projected := projectGraphByInstance(graph, instanceID)
-	return enrichGraphForTaskRuntime(projected, instanceID, instanceTasks), nil
+	enriched := enrichGraphForTaskRuntime(projected, instanceID, instanceTasks)
+	mutableGraph := taskcreation.DesignerGraph{
+		Nodes: enriched.Nodes,
+		Edges: enriched.Edges,
+	}
+	taskcreation.NormalizeInstanceRouting(&mutableGraph, instanceID)
+	enriched.Nodes = mutableGraph.Nodes
+	enriched.Edges = mutableGraph.Edges
+	return enriched, nil
 }
 
 func projectGraphByInstance(graph DesignerGraphPayload, instanceID string) DesignerGraphPayload {

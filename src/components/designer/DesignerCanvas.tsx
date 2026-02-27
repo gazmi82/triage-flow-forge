@@ -94,14 +94,29 @@ export function DesignerCanvas() {
 
   const renderedEdges = useMemo(
     () =>
-      normalizedEdges.map((edge) => ({
-        ...edge,
-        type: "smoothstep",
-        pathOptions: {
-          borderRadius: 0,
-          offset: 28,
-        },
-      })),
+      normalizedEdges.map((edge) => {
+        const strokeColor =
+          typeof edge.style?.stroke === "string"
+            ? edge.style.stroke
+            : "hsl(220,68%,30%)";
+
+        return {
+          ...edge,
+          type: "smoothstep",
+          style: {
+            ...edge.style,
+            stroke: strokeColor,
+          },
+          markerEnd: {
+            type: "arrowclosed" as const,
+            color: strokeColor,
+          },
+          pathOptions: {
+            borderRadius: 0,
+            offset: 42,
+          },
+        };
+      }),
     [normalizedEdges],
   );
 
@@ -118,7 +133,7 @@ export function DesignerCanvas() {
             nodesDraggable={false}
             nodesConnectable={false}
             elementsSelectable={false}
-            className="h-full"
+            className="designer-canvas h-full"
           >
             <Background
               variant={BackgroundVariant.Dots}

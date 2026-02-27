@@ -2,6 +2,8 @@ import { Handle, Position, type NodeProps } from "@xyflow/react";
 import { Clock, Mail, User, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
+const TASK_PORT_PERCENTS = [16, 33, 50, 67, 84];
+
 // ── Start Event ───────────────────────────────────────────────────────────────
 export function StartEventNode({ data, selected }: NodeProps) {
   const runtimeActive = data.runtimeActive === true;
@@ -55,7 +57,7 @@ export function UserTaskNode({ data, selected }: NodeProps) {
 
   return (
     <div className={cn(
-      "relative flex min-w-[140px] flex-col rounded-md border-2 border-node-task bg-card shadow-sm transition-shadow",
+      "user-task-node relative flex min-w-[140px] flex-col rounded-md border-2 border-node-task bg-card shadow-sm transition-shadow",
       selected && "ring-2 ring-node-task ring-offset-2 shadow-md",
       runtimeActive && "ring-2 ring-success ring-offset-2"
     )}>
@@ -75,14 +77,95 @@ export function UserTaskNode({ data, selected }: NodeProps) {
           <span className="ml-1 inline-flex h-2 w-2 animate-pulse rounded-full bg-success align-middle" />
         )}
       </div>
+      {TASK_PORT_PERCENTS.map((pct, idx) => (
+        <Handle
+          key={`task-left-t-${idx}`}
+          id={`left-${idx + 1}`}
+          type="target"
+          position={Position.Left}
+          style={{ top: `${pct}%` }}
+          className="!bg-node-task !border-node-task"
+        />
+      ))}
+      {TASK_PORT_PERCENTS.map((pct, idx) => (
+        <Handle
+          key={`task-right-t-${idx}`}
+          id={`right-${idx + 1}`}
+          type="target"
+          position={Position.Right}
+          style={{ top: `${pct}%` }}
+          className="!bg-node-task !border-node-task"
+        />
+      ))}
+      {TASK_PORT_PERCENTS.map((pct, idx) => (
+        <Handle
+          key={`task-top-t-${idx}`}
+          id={`top-${idx + 1}`}
+          type="target"
+          position={Position.Top}
+          style={{ left: `${pct}%` }}
+          className="!bg-node-task !border-node-task"
+        />
+      ))}
+      {TASK_PORT_PERCENTS.map((pct, idx) => (
+        <Handle
+          key={`task-bottom-t-${idx}`}
+          id={`bottom-${idx + 1}`}
+          type="target"
+          position={Position.Bottom}
+          style={{ left: `${pct}%` }}
+          className="!bg-node-task !border-node-task"
+        />
+      ))}
+      {TASK_PORT_PERCENTS.map((pct, idx) => (
+        <Handle
+          key={`task-left-s-${idx}`}
+          id={`left-${idx + 1}`}
+          type="source"
+          position={Position.Left}
+          style={{ top: `${pct}%` }}
+          className="!bg-node-task !border-node-task"
+        />
+      ))}
+      {TASK_PORT_PERCENTS.map((pct, idx) => (
+        <Handle
+          key={`task-right-s-${idx}`}
+          id={`right-${idx + 1}`}
+          type="source"
+          position={Position.Right}
+          style={{ top: `${pct}%` }}
+          className="!bg-node-task !border-node-task"
+        />
+      ))}
+      {TASK_PORT_PERCENTS.map((pct, idx) => (
+        <Handle
+          key={`task-top-s-${idx}`}
+          id={`top-${idx + 1}`}
+          type="source"
+          position={Position.Top}
+          style={{ left: `${pct}%` }}
+          className="!bg-node-task !border-node-task"
+        />
+      ))}
+      {TASK_PORT_PERCENTS.map((pct, idx) => (
+        <Handle
+          key={`task-bottom-s-${idx}`}
+          id={`bottom-${idx + 1}`}
+          type="source"
+          position={Position.Bottom}
+          style={{ left: `${pct}%` }}
+          className="!bg-node-task !border-node-task"
+        />
+      ))}
+      {/* Backward compatibility for existing edges persisted with legacy side-only handle IDs. */}
       <Handle id="left" type="target" position={Position.Left} className="!bg-node-task !border-node-task" />
       <Handle id="top" type="target" position={Position.Top} className="!bg-node-task !border-node-task" />
       <Handle id="bottom" type="target" position={Position.Bottom} className="!bg-node-task !border-node-task" />
       <Handle id="right" type="target" position={Position.Right} className="!bg-node-task !border-node-task" />
-      <Handle id="right" type="source" position={Position.Right} className="!bg-node-task !border-node-task" />
       <Handle id="left" type="source" position={Position.Left} className="!bg-node-task !border-node-task" />
       <Handle id="top" type="source" position={Position.Top} className="!bg-node-task !border-node-task" />
       <Handle id="bottom" type="source" position={Position.Bottom} className="!bg-node-task !border-node-task" />
+      <Handle id="right" type="source" position={Position.Right} className="!bg-node-task !border-node-task" />
     </div>
   );
 }

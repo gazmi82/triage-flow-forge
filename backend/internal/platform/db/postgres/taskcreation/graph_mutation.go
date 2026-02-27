@@ -144,6 +144,7 @@ func AppendNodeToGraph(graph *DesignerGraph, req AppendNodeRequest) string {
 		sourceID = startNodeID
 	}
 	if sourceID == "" || sourceID == targetNodeID || edgeExists(graph.Edges, sourceID, targetNodeID) {
+		NormalizeInstanceRouting(graph, req.InstanceID)
 		return targetNodeID
 	}
 
@@ -193,6 +194,7 @@ func AppendNodeToGraph(graph *DesignerGraph, req AppendNodeRequest) string {
 		edge["label"] = strings.TrimSpace(req.ConditionExpression)
 	}
 	graph.Edges = append(graph.Edges, edge)
+	NormalizeInstanceRouting(graph, req.InstanceID)
 
 	return targetNodeID
 }

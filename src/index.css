@@ -113,6 +113,19 @@
   stroke: hsl(var(--accent));
 }
 
+/* Keep task handles functional for routing, but hide only on user-task cards. */
+.designer-canvas .user-task-node .react-flow__handle {
+  opacity: 0 !important;
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  pointer-events: none !important;
+  width: 1px !important;
+  height: 1px !important;
+  min-width: 1px !important;
+  min-height: 1px !important;
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
