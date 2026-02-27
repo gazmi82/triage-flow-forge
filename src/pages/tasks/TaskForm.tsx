@@ -92,11 +92,15 @@ export function TaskForm({ task, selectedNodeType, onComplete, onSave }: TaskFor
     if (triageLabel && typeof seededValues.severity !== "string") {
       seededValues.severity = triageLabel;
     }
+    const seededCorrelationKey =
+      typeof seededValues.correlation_key === "string"
+        ? seededValues.correlation_key
+        : "";
     setValues(seededValues);
     setErrors({});
     setRedirectRole("");
     setShowRedirectAccordion(true);
-    setCorrelationKey("");
+    setCorrelationKey(seededCorrelationKey);
     setBranchARole("");
     setBranchBRole("");
     setXorSelectedCondition("");
@@ -134,10 +138,12 @@ export function TaskForm({ task, selectedNodeType, onComplete, onSave }: TaskFor
   const branchARoleFromValues = getStringValue("branch_a_role") as Role | "";
   const branchBRoleFromValues = getStringValue("branch_b_role") as Role | "";
   const xorConditionFromValues = getStringValue("xor_active_condition") as "critical" | "non_critical" | "";
+  const correlationKeyFromValues = getStringValue("correlation_key");
   const effectiveRedirectRole = redirectRole || redirectRoleFromValues;
   const effectiveBranchARole = branchARole || branchARoleFromValues;
   const effectiveBranchBRole = branchBRole || branchBRoleFromValues;
   const effectiveXorCondition = xorSelectedCondition || xorConditionFromValues;
+  const effectiveCorrelationKey = correlationKey || correlationKeyFromValues;
 
   const inferTriageColorFromForm = (): TriageColor | undefined => {
     const candidates = [
@@ -222,7 +228,7 @@ export function TaskForm({ task, selectedNodeType, onComplete, onSave }: TaskFor
         return;
       }
     }
-    if (selectedNodeType === "messageEvent" && correlationKey.trim().length === 0) {
+    if (selectedNodeType === "messageEvent" && effectiveCorrelationKey.trim().length === 0) {
       toast({
         title: "Correlation key required",
         description: "Message events require a correlation key.",
@@ -264,7 +270,10 @@ export function TaskForm({ task, selectedNodeType, onComplete, onSave }: TaskFor
         selectedNodeType === "xorGateway"
           ? "critical | non_critical"
           : undefined,
-      correlationKey: selectedNodeType === "messageEvent" ? correlationKey.trim() || undefined : undefined,
+      correlationKey:
+        selectedNodeType === "messageEvent"
+          ? effectiveCorrelationKey.trim() || undefined
+          : undefined,
       triageColor: inferTriageColorFromForm(),
     });
     resetForm();
@@ -364,8 +373,11 @@ export function TaskForm({ task, selectedNodeType, onComplete, onSave }: TaskFor
 
       <EventConfigService
         selectedNodeType={selectedNodeType}
-        correlationKey={correlationKey}
-        onCorrelationKeyChange={setCorrelationKey}
+        correlationKey={effectiveCorrelationKey}
+        onCorrelationKeyChange={(value) => {
+          setCorrelationKey(value);
+          setFieldValue("correlation_key", value);
+        }}
       />
 
       {selectedNodeType !== "xorGateway" && selectedNodeType !== "andGateway" && selectedNodeType !== "endEvent" && (

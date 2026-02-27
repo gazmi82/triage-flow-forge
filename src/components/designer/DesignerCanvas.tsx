@@ -9,7 +9,7 @@ import {
   BackgroundVariant,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { NODE_TYPES } from "./BpmnNodes";
+import { NODE_TYPES, EDGE_TYPES } from "./BpmnNodes";
 import { DesignerToolbar } from "./DesignerToolbar";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { bootstrapWorkflowThunk } from "@/store/slices/workflowSlice";
@@ -102,7 +102,7 @@ export function DesignerCanvas() {
 
         return {
           ...edge,
-          type: "smoothstep",
+          type: "orthogonal",
           style: {
             ...edge.style,
             stroke: strokeColor,
@@ -110,10 +110,6 @@ export function DesignerCanvas() {
           markerEnd: {
             type: "arrowclosed" as const,
             color: strokeColor,
-          },
-          pathOptions: {
-            borderRadius: 0,
-            offset: 42,
           },
         };
       }),
@@ -129,6 +125,7 @@ export function DesignerCanvas() {
             nodes={nodes}
             edges={renderedEdges}
             nodeTypes={NODE_TYPES}
+            edgeTypes={EDGE_TYPES}
             fitView
             nodesDraggable={false}
             nodesConnectable={false}

@@ -657,7 +657,9 @@ func collectExistingSegments(edges []map[string]any, nodeByID map[string]map[str
 		if targetHandle == "" {
 			targetHandle = "left"
 		}
-		route := buildOrthogonalRoute(sourceNode, sourceHandle, targetNode, targetHandle, true)
+		sx, sy := nodeCenter(sourceNode)
+		tx, ty := nodeCenter(targetNode)
+		route := buildOrthogonalRoute(sourceNode, sourceHandle, targetNode, targetHandle, absInt(tx-sx) >= absInt(ty-sy))
 		segments = append(segments, route...)
 	}
 	return segments

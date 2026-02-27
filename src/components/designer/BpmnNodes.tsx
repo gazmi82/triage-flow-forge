@@ -1,4 +1,4 @@
-import { Handle, Position, type NodeProps } from "@xyflow/react";
+import { Handle, Position, type NodeProps, BaseEdge, type EdgeProps } from "@xyflow/react";
 import { Clock, Mail, User, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -318,3 +318,94 @@ export const NODE_TYPES = {
   messageEvent: MessageEventNode,
   signalEvent: SignalEventNode,
 };
+
+// ── Orthogonal Sequence-Flow Edge ─────────────────────────────────────────────
+// Mirrors buildOrthogonalRoute() in layout_routing.go so the visual path
+// matches exactly what the backend uses for crossing detection.
+const EDGE_OFFSET = 42;
+
+function stubOffset(pos: Position): { dx: number; dy: number } {
+  if (pos === Position.Right)  return { dx:  EDGE_OFFSET, dy: 0 };
+  if (pos === Position.Left)   return { dx: -EDGE_OFFSET, dy: 0 };
+  if (pos === Position.Bottom) return { dx: 0, dy:  EDGE_OFFSET };
+  /* Top */                    return { dx: 0, dy: -EDGE_OFFSET };
+}
+
+function orthogonalPath(
+  sx: number, sy: number, sp: Position,
+  tx: number, ty: number, tp: Position,
+): { d: string; labelX: number; labelY: number } {
+  const so = stubOffset(sp);
+  const to = stubOffset(tp);
+  const ox = sx + so.dx; // source stub end x
+  const oy = sy + so.dy; // source stub end y
+  const px = tx + to.dx; // target stub end x
+  const py = ty + to.dy; // target stub end y
+
+  // preferHorizontal matches backend: abs(dx) >= abs(dy) using handle positions
+  const preferH = Math.abs(tx - sx) >= Math.abs(ty - sy);
+
+  if (ox === px || oy === py) {
+    // Already aligned — single straight segment between stubs
+    return {
+      d: `M ${sx} ${sy} L ${ox} ${oy} L ${px} ${py} L ${tx} ${ty}`,
+      labelX: (ox + px) / 2,
+      labelY: (oy + py) / 2,
+    };
+  }
+
+  if (preferH) {
+    // Turn at {px, oy} — bends near the target (matches backend preferHorizontal=true)
+    return {
+      d: `M ${sx} ${sy} L ${ox} ${oy} L ${px} ${oy} L ${px} ${py} L ${tx} ${ty}`,
+      labelX: (ox + px) / 2,
+      labelY: oy,
+    };
+  }
+
+  // Turn at {ox, py} — bends near the source (matches backend preferHorizontal=false)
+  return {
+    d: `M ${sx} ${sy} L ${ox} ${oy} L ${ox} ${py} L ${px} ${py} L ${tx} ${ty}`,
+    labelX: ox,
+    labelY: (oy + py) / 2,
+  };
+}
+
+export function OrthogonalEdge({
+  id,
+  sourceX, sourceY, sourcePosition,
+  targetX, targetY, targetPosition,
+  style,
+  markerEnd,
+  label,
+  labelStyle,
+  labelShowBg,
+  labelBgStyle,
+  labelBgPadding,
+  labelBgBorderRadius,
+  interactionWidth,
+}: EdgeProps) {
+  const { d, labelX, labelY } = orthogonalPath(
+    sourceX, sourceY, sourcePosition,
+    targetX, targetY, targetPosition,
+  );
+  return (
+    <BaseEdge
+      id={id}
+      path={d}
+      style={style}
+      markerEnd={markerEnd}
+      label={label}
+      labelX={labelX}
+      labelY={labelY}
+      labelStyle={labelStyle}
+      labelShowBg={labelShowBg}
+      labelBgStyle={labelBgStyle}
+      labelBgPadding={labelBgPadding}
+      labelBgBorderRadius={labelBgBorderRadius}
+      interactionWidth={interactionWidth}
+    />
+  );
+}
+
+export const EDGE_TYPES = { orthogonal: OrthogonalEdge };
