@@ -3,13 +3,14 @@ package tasks
 import (
 	"context"
 
-	"triage-flow-forge/backend/internal/platform/db/postgres"
+	"triage-flow-forge/backend/internal/modules/contracts"
 )
 
 type Repository interface {
-	FetchTasks(ctx context.Context) ([]postgres.Task, error)
-	FetchTaskDesignerGraph(ctx context.Context, taskID string) (postgres.DesignerGraphPayload, error)
-	ClaimTask(ctx context.Context, taskID, assigneeName string) (postgres.TaskMutationResponse, error)
-	SaveTaskEdits(ctx context.Context, taskID string, req postgres.SaveTaskEditsRequest) (postgres.TaskMutationResponse, error)
-	CompleteTask(ctx context.Context, taskID string, req postgres.CompleteTaskRequest) (postgres.TaskMutationResponse, error)
+	FetchTasks(ctx context.Context) ([]contracts.Task, error)
+	FetchTaskDesignerGraph(ctx context.Context, taskID string) (contracts.DesignerGraphPayload, error)
+	ClaimTask(ctx context.Context, taskID, assigneeName string) (contracts.TaskMutationResponse, error)
+	SaveTaskEdits(ctx context.Context, taskID string, req contracts.SaveTaskEditsRequest) (contracts.TaskMutationResponse, error)
+	CompleteTask(ctx context.Context, taskID string, req contracts.CompleteTaskRequest) (contracts.TaskMutationResponse, error)
+	DeleteTask(ctx context.Context, taskID string) (contracts.TaskMutationResponse, error)
 }

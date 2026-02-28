@@ -301,6 +301,15 @@ export default function Tasks() {
     }
   }, [currentRole, dispatch, user?.role]);
 
+  const handlePaletteConfigChange = useCallback((payload: { nodeType: TaskNodeType; label: string; triageColor: TriageColor }) => {
+    setSelectedNodeType((prev) => (prev === payload.nodeType ? prev : payload.nodeType));
+    setCreateConfig((prev) =>
+      prev.label === payload.label && prev.triageColor === payload.triageColor
+        ? prev
+        : { label: payload.label, triageColor: payload.triageColor }
+    );
+  }, []);
+
   useEffect(() => {
     const handleCreateFromTopBar = () => {
       void createTask({
@@ -339,10 +348,7 @@ export default function Tasks() {
         <NodeTypePalette
           selected={selectedNodeType}
           onSelect={setSelectedNodeType}
-          onConfigChange={(payload) => {
-            setSelectedNodeType(payload.nodeType);
-            setCreateConfig({ label: payload.label, triageColor: payload.triageColor });
-          }}
+          onConfigChange={handlePaletteConfigChange}
           currentRole={currentRole}
         />
       </div>

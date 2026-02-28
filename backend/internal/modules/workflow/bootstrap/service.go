@@ -1,4 +1,4 @@
-package admin
+package bootstrap
 
 import (
 	"context"
@@ -14,6 +14,6 @@ func NewService(repo Repository) Service {
 	return Service{repo: repo}
 }
 
-func (s Service) CreateUser(ctx context.Context, req contracts.AdminCreateUserRequest) (contracts.AdminCreateUserResponse, error) {
-	return s.repo.CreateUser(ctx, req)
+func (s Service) FetchWorkflowBootstrap(ctx context.Context) (contracts.WorkflowBootstrapPayload, error) {
+	return s.repo.FetchWorkflowBootstrap(ctx)
 }

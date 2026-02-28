@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import {
   ReactFlow,
   Background,
@@ -6,13 +6,17 @@ import {
   MiniMap,
   type Edge,
   type Node,
+  type NodeChange,
   BackgroundVariant,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { NODE_TYPES, EDGE_TYPES } from "./BpmnNodes";
 import { DesignerToolbar } from "./DesignerToolbar";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
-import { bootstrapWorkflowThunk } from "@/store/slices/workflowSlice";
+import {
+  applyDesignerNodeChanges,
+  bootstrapWorkflowThunk,
+} from "@/store/slices/workflowSlice";
 
 export function DesignerCanvas() {
   const dispatch = useAppDispatch();
@@ -30,6 +34,13 @@ export function DesignerCanvas() {
       dispatch(bootstrapWorkflowThunk());
     }
   }, [dispatch, hasBootstrapped, isLoading]);
+
+  const onNodesChange = useCallback(
+    (changes: NodeChange[]) => {
+      dispatch(applyDesignerNodeChanges(changes));
+    },
+    [dispatch],
+  );
 
   const normalizedEdges = useMemo(() => {
     const nextEdges: Edge[] = edges.map((edge) => ({ ...edge }));
@@ -124,12 +135,13 @@ export function DesignerCanvas() {
           <ReactFlow
             nodes={nodes}
             edges={renderedEdges}
+            onNodesChange={onNodesChange}
             nodeTypes={NODE_TYPES}
             edgeTypes={EDGE_TYPES}
             fitView
-            nodesDraggable={false}
+            nodesDraggable
             nodesConnectable={false}
-            elementsSelectable={false}
+            elementsSelectable
             className="designer-canvas h-full"
           >
             <Background

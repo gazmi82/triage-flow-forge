@@ -3,9 +3,9 @@ package auth
 import (
 	"context"
 
-	"triage-flow-forge/backend/internal/platform/db/postgres"
+	"triage-flow-forge/backend/internal/modules/contracts"
 )
 
 type Repository interface {
-	Login(ctx context.Context, email, password string) (postgres.AuthPayload, error)
+	Login(ctx context.Context, email, password string) (contracts.AuthPayload, error)
 }

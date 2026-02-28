@@ -310,3 +310,42 @@ export async function saveTaskEdits(
     audit: deepClone(mockStore.audit),
   };
 }
+
+export async function deleteTask(taskId: string): Promise<TaskApiResponse> {
+  await ensureInitialized();
+  await sleep();
+
+  const task = mockStore.tasks.find((item) => item.id === taskId);
+  if (!task) {
+    throw new Error("task not found");
+  }
+
+  const savedTask = mockStore.savedTasks.find((record) => {
+    const id = typeof record.id === "string" ? record.id : "";
+    return id === taskId;
+  });
+  const processStatus =
+    typeof savedTask?.processStatus === "string"
+      ? savedTask.processStatus.toLowerCase()
+      : "open";
+  const instance = mockStore.instances.find((item) => item.id === task.instanceId);
+  const instanceStatus = (instance?.status ?? "").toLowerCase();
+
+  if (processStatus !== "closed" || instanceStatus !== "completed") {
+    throw new Error("task can be deleted only after END is reached and process is closed");
+  }
+
+  mockStore.tasks = mockStore.tasks.filter((item) => item.id !== taskId);
+  mockStore.savedTasks = mockStore.savedTasks.filter((record) => {
+    const id = typeof record.id === "string" ? record.id : "";
+    return id !== taskId;
+  });
+
+  return {
+    tasks: deepClone(mockStore.tasks),
+    savedTasks: deepClone(mockStore.savedTasks),
+    graph: deepClone(mockStore.designerGraph),
+    instances: deepClone(mockStore.instances),
+    audit: deepClone(mockStore.audit),
+  };
+}

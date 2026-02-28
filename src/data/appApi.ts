@@ -47,6 +47,13 @@ export const appApi = {
     return apiClient.claimTask(taskId, assigneeName);
   },
 
+  async deleteTask(taskId: string) {
+    if (!useRealApi) {
+      return mockApi.deleteTask(taskId);
+    }
+    return apiClient.deleteTask(taskId);
+  },
+
   async createTaskFromConsole(payload: CreateTaskFromConsolePayload) {
     return apiClient.createTaskFromConsole(payload);
   },

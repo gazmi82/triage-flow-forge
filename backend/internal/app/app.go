@@ -6,11 +6,16 @@ import (
 	"net/http"
 	"time"
 
-	adminmodule "triage-flow-forge/backend/internal/modules/admin/repository/postgres"
-	authmodule "triage-flow-forge/backend/internal/modules/auth/repository/postgres"
-	bootstrapmodule "triage-flow-forge/backend/internal/modules/workflow/bootstrap/repository/postgres"
-	taskcreationmodule "triage-flow-forge/backend/internal/modules/workflow/taskcreation/repository/postgres"
-	tasksmodule "triage-flow-forge/backend/internal/modules/workflow/tasks/repository/postgres"
+	"triage-flow-forge/backend/internal/modules/admin"
+	adminrepo "triage-flow-forge/backend/internal/modules/admin/repository/postgres"
+	"triage-flow-forge/backend/internal/modules/auth"
+	authrepo "triage-flow-forge/backend/internal/modules/auth/repository/postgres"
+	workflowbootstrap "triage-flow-forge/backend/internal/modules/workflow/bootstrap"
+	bootstraprepo "triage-flow-forge/backend/internal/modules/workflow/bootstrap/repository/postgres"
+	workflowtaskcreation "triage-flow-forge/backend/internal/modules/workflow/taskcreation"
+	taskcreationrepo "triage-flow-forge/backend/internal/modules/workflow/taskcreation/repository/postgres"
+	workflowtasks "triage-flow-forge/backend/internal/modules/workflow/tasks"
+	tasksrepo "triage-flow-forge/backend/internal/modules/workflow/tasks/repository/postgres"
 	"triage-flow-forge/backend/internal/platform/cache/redis"
 	"triage-flow-forge/backend/internal/platform/db/postgres"
 	"triage-flow-forge/backend/internal/platform/metrics"
@@ -30,21 +35,21 @@ func New(cfg Config) (*App, error) {
 	metricRegistry := metrics.New()
 	pg.SetMetrics(metricRegistry)
 	rdb := redis.NewClient(cfg.RedisAddr, cfg.RedisPassword, cfg.RedisDB)
-	authRepo := authmodule.New(pg)
-	adminRepo := adminmodule.New(pg)
-	bootstrapRepo := bootstrapmodule.New(pg)
-	tasksRepo := tasksmodule.New(pg)
-	taskCreationRepo := taskcreationmodule.New(pg)
+	authService := auth.NewService(authrepo.New(pg))
+	adminService := admin.NewService(adminrepo.New(pg))
+	bootstrapService := workflowbootstrap.NewService(bootstraprepo.New(pg))
+	tasksService := workflowtasks.NewService(tasksrepo.New(pg))
+	taskCreationService := workflowtaskcreation.NewService(taskcreationrepo.New(pg))
 
 	router := httptransport.NewRouter(httptransport.Dependencies{
 		Readiness: pg,
 		Redis:     rdb,
 		Metrics:   metricRegistry,
-		Auth:      authRepo,
-		Admin:     adminRepo,
-		Bootstrap: bootstrapRepo,
-		Tasks:     tasksRepo,
-		Creation:  taskCreationRepo,
+		Auth:      authService,
+		Admin:     adminService,
+		Bootstrap: bootstrapService,
+		Tasks:     tasksService,
+		Creation:  taskCreationService,
 	})
 
 	return &App{

@@ -9,10 +9,22 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PriorityBadge, RoleBadge, StatusBadge } from "@/components/ui/Badges";
 import { formatTime } from "@/lib/formatters";
 import { useAuth } from "@/hooks";
+import { useToast } from "@/hooks/use-toast";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
-import { bootstrapWorkflowThunk, loadDraftThunk, openTaskDesignerThunk } from "@/store/slices/workflowSlice";
-import { FileText, Grid3X3, List, Search } from "lucide-react";
+import {
+  bootstrapWorkflowThunk,
+  deleteTaskThunk,
+  loadDraftThunk,
+  openTaskDesignerThunk,
+} from "@/store/slices/workflowSlice";
+import { EllipsisVertical, Eye, FileText, Grid3X3, List, Search, Trash2 } from "lucide-react";
 import { ROLE_LABELS } from "@/data/constants";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type SortField = "createdAt" | "updatedAt";
 type SortDirection = "asc" | "desc";
@@ -25,6 +37,7 @@ const getEffectiveProcessStatus = (task: { status: string; processStatus?: "open
 export default function SavedTasks() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const { user } = useAuth();
   const savedTasks = useAppSelector((state) => state.workflow.savedTasks);
   const drafts = useAppSelector((state) => state.workflow.drafts);
@@ -44,8 +57,9 @@ export default function SavedTasks() {
 
   const visibleSavedTasks = useMemo(() => {
     if (!user) return [];
-    if (user.role === "admin") return savedTasks;
-    return savedTasks.filter((task) => task.role === user.role || task.assignee === user.name);
+    return user.role === "admin"
+      ? savedTasks
+      : savedTasks.filter((task) => task.role === user.role || task.assignee === user.name);
   }, [savedTasks, user]);
 
   const filtered = useMemo(() => {
@@ -78,6 +92,31 @@ export default function SavedTasks() {
   const redirectTaskProcess = async (taskId: string) => {
     await dispatch(openTaskDesignerThunk({ taskId }));
     navigate("/designer");
+  };
+
+  const viewTask = (taskId: string) => {
+    navigate("/tasks");
+    toast({
+      title: "Opening task console",
+      description: `Task ${taskId} opened in Task Console context.`,
+    });
+  };
+
+  const deleteTaskFromList = async (taskId: string) => {
+    const result = await dispatch(deleteTaskThunk({ taskId }));
+    if (deleteTaskThunk.fulfilled.match(result)) {
+      toast({
+        title: "Task deleted",
+        description: `Task ${taskId} deleted from open tasks.`,
+      });
+      return;
+    }
+
+    toast({
+      title: "Delete blocked",
+      description: result.error.message ?? "Task can be deleted only after process END.",
+      variant: "destructive",
+    });
   };
 
   const getTaskTitle = (task: (typeof filtered)[number]) => ROLE_LABELS[task.role];
@@ -177,9 +216,35 @@ export default function SavedTasks() {
                       <td className="px-3 py-2">{formatTime(task.createdAt)}</td>
                       <td className="px-3 py-2">{formatTime(task.updatedAt ?? task.createdAt)}</td>
                       <td className="px-3 py-2">
-                        <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => redirectTaskProcess(task.id)}>
-                          Redirect to Process
-                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              aria-label={`Actions for ${task.id}`}
+                            >
+                              <EllipsisVertical className="h-3.5 w-3.5" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-40">
+                            <DropdownMenuItem onSelect={() => void redirectTaskProcess(task.id)}>
+                              Canvas
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => viewTask(task.id)}>
+                              <Eye className="mr-2 h-3.5 w-3.5" />
+                              View
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              disabled={getEffectiveProcessStatus(task) !== "closed"}
+                              onSelect={() => void deleteTaskFromList(task.id)}
+                              className="text-destructive focus:text-destructive"
+                            >
+                              <Trash2 className="mr-2 h-3.5 w-3.5" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </td>
                     </tr>
                   ))}
@@ -201,7 +266,7 @@ export default function SavedTasks() {
                     <p className="text-muted-foreground">updated_at: {formatTime(task.updatedAt ?? task.createdAt)}</p>
                     <Badge variant={getEffectiveProcessStatus(task) === "open" ? "secondary" : "outline"}>{getEffectiveProcessStatus(task)}</Badge>
                     <Button size="sm" variant="outline" className="h-7 text-[10px]" onClick={() => redirectTaskProcess(task.id)}>
-                      Redirect to Process
+                      Canvas
                     </Button>
                   </CardContent>
                 </Card>
@@ -234,7 +299,7 @@ export default function SavedTasks() {
                   </CardHeader>
                   <CardContent className="flex items-center justify-between">
                     <div className="text-xs text-muted-foreground">{draft.graph.nodes.length} nodes · {draft.graph.edges.length} edges</div>
-                    <Button size="sm" onClick={() => openDraft(draft.id)}>Redirect to Process</Button>
+                    <Button size="sm" onClick={() => openDraft(draft.id)}>Canvas</Button>
                   </CardContent>
                 </Card>
               ))}

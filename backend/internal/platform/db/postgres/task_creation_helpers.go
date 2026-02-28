@@ -252,7 +252,7 @@ VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'claimed',$9,$10,$11,$12,$12,$13,$14,$15,$16,$10
 UPDATE tasks
 SET
   name = $2,
-  assignee_name = COALESCE(NULLIF(assignee_name,''), $3),
+  assignee_name = $3,
   role_key = $4,
   status = 'claimed',
   priority = $5,

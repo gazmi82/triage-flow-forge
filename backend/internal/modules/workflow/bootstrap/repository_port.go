@@ -3,9 +3,9 @@ package bootstrap
 import (
 	"context"
 
-	"triage-flow-forge/backend/internal/platform/db/postgres"
+	"triage-flow-forge/backend/internal/modules/contracts"
 )
 
 type Repository interface {
-	FetchWorkflowBootstrap(ctx context.Context) (postgres.WorkflowBootstrapPayload, error)
+	FetchWorkflowBootstrap(ctx context.Context) (contracts.WorkflowBootstrapPayload, error)
 }

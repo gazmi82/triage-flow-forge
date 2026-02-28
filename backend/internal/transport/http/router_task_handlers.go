@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	"triage-flow-forge/backend/internal/platform/db/postgres"
+	"triage-flow-forge/backend/internal/modules/contracts"
 )
 
 type claimTaskRequest struct {
@@ -71,13 +71,28 @@ func (s *server) handleTaskActions(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		var req postgres.CompleteTaskRequest
+		var req contracts.CompleteTaskRequest
 		if err := decodeJSON(r, &req); err != nil {
 			writeError(w, http.StatusBadRequest, "invalid request body")
 			return
 		}
 
 		payload, err := s.deps.Tasks.CompleteTask(r.Context(), taskID, req)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, payload)
+		return
+
+	case r.Method == http.MethodDelete:
+		taskID := strings.Trim(path, "/")
+		if taskID == "" || strings.Contains(taskID, "/") {
+			writeError(w, http.StatusNotFound, "route not found")
+			return
+		}
+
+		payload, err := s.deps.Tasks.DeleteTask(r.Context(), taskID)
 		if err != nil {
 			writeError(w, http.StatusBadRequest, err.Error())
 			return
@@ -92,7 +107,7 @@ func (s *server) handleTaskActions(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		var req postgres.SaveTaskEditsRequest
+		var req contracts.SaveTaskEditsRequest
 		if err := decodeJSON(r, &req); err != nil {
 			writeError(w, http.StatusBadRequest, "invalid request body")
 			return
@@ -118,7 +133,7 @@ func (s *server) handleCreateTaskFromConsole(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	var req postgres.CreateTaskFromConsoleRequest
+	var req contracts.CreateTaskFromConsoleRequest
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return

@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 
+	"triage-flow-forge/backend/internal/modules/contracts"
 	"triage-flow-forge/backend/internal/platform/db/postgres"
 )
 
@@ -14,6 +15,6 @@ func New(client *postgres.Client) *Repository {
 	return &Repository{client: client}
 }
 
-func (r *Repository) CreateTaskFromConsole(ctx context.Context, req postgres.CreateTaskFromConsoleRequest) (postgres.CreateTaskFromConsoleResponse, error) {
+func (r *Repository) CreateTaskFromConsole(ctx context.Context, req contracts.CreateTaskFromConsoleRequest) (contracts.CreateTaskFromConsoleResponse, error) {
 	return r.client.CreateTaskFromConsole(ctx, req)
 }

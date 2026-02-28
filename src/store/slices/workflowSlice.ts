@@ -71,6 +71,7 @@ const initialState: WorkflowState = {
 type BootstrapPayload = Awaited<ReturnType<typeof appApi.fetchBootstrapData>>;
 type ClaimTaskPayload = Awaited<ReturnType<typeof appApi.claimTask>>;
 type CompleteTaskPayload = Awaited<ReturnType<typeof appApi.completeTask>>;
+type DeleteTaskPayload = Awaited<ReturnType<typeof appApi.deleteTask>>;
 type SaveTaskEditsPayload = Awaited<ReturnType<typeof appApi.saveTaskEdits>>;
 type CreateTaskFromConsoleResult = Awaited<ReturnType<typeof appApi.createTaskFromConsole>>;
 type SaveDraftPayload = Awaited<ReturnType<typeof appApi.saveDraft>>;
@@ -104,6 +105,13 @@ export const completeTaskThunk = createAsyncThunk<
   "workflow/completeTask",
   async (payload) => {
     return await appApi.completeTask(payload.taskId, payload.actor, payload.patientName, payload.patientId);
+  }
+);
+
+export const deleteTaskThunk = createAsyncThunk<DeleteTaskPayload, { taskId: string }>(
+  "workflow/deleteTask",
+  async (payload) => {
+    return await appApi.deleteTask(payload.taskId);
   }
 );
 
@@ -270,6 +278,14 @@ const workflowSlice = createSlice({
         state.audit = action.payload.audit;
       })
       .addCase(completeTaskThunk.fulfilled, (state, action) => {
+        state.tasks = action.payload.tasks;
+        state.savedTasks = action.payload.savedTasks;
+        state.audit = action.payload.audit;
+        state.designerNodes = toDesignerNodes(action.payload.graph.nodes);
+        state.designerEdges = toDesignerEdges(action.payload.graph.edges);
+        state.instances = action.payload.instances;
+      })
+      .addCase(deleteTaskThunk.fulfilled, (state, action) => {
         state.tasks = action.payload.tasks;
         state.savedTasks = action.payload.savedTasks;
         state.audit = action.payload.audit;

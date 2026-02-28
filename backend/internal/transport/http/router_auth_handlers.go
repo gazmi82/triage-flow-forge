@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"time"
 
+	"triage-flow-forge/backend/internal/modules/contracts"
 	"triage-flow-forge/backend/internal/platform/cache/redis"
 	"triage-flow-forge/backend/internal/platform/db/postgres"
 )
@@ -18,8 +19,8 @@ type loginRequest struct {
 }
 
 type authSessionRecord struct {
-	User      postgres.AuthPayload `json:"user"`
-	CreatedAt string               `json:"createdAt"`
+	User      contracts.AuthPayload `json:"user"`
+	CreatedAt string                `json:"createdAt"`
 }
 
 const (
@@ -92,7 +93,7 @@ func (s *server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var req postgres.AdminCreateUserRequest
+	var req contracts.AdminCreateUserRequest
 	if err := decodeJSON(r, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid request body")
 		return

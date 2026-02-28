@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 
+	"triage-flow-forge/backend/internal/modules/contracts"
 	"triage-flow-forge/backend/internal/platform/db/postgres"
 )
 
@@ -14,6 +15,6 @@ func New(client *postgres.Client) *Repository {
 	return &Repository{client: client}
 }
 
-func (r *Repository) CreateUser(ctx context.Context, req postgres.AdminCreateUserRequest) (postgres.AdminCreateUserResponse, error) {
+func (r *Repository) CreateUser(ctx context.Context, req contracts.AdminCreateUserRequest) (contracts.AdminCreateUserResponse, error) {
 	return r.client.CreateUser(ctx, req)
 }

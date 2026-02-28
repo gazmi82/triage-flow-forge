@@ -68,6 +68,21 @@ func AppendNodeToGraph(graph *DesignerGraph, req AppendNodeRequest) string {
 	}
 
 	reusedNode := false
+	sourceNodeType := ""
+	if sourceNode := findNodeByID(instanceNodes, req.FromNodeID); sourceNode != nil {
+		sourceNodeType, _ = sourceNode["type"].(string)
+	}
+
+	// For non-gateway user-task sources, redirect should update the existing outgoing
+	// user-task target instead of creating parallel duplicate branches.
+	// Do not reuse for endEvent/gateway/event creation.
+	if req.NormalizedNodeType == "userTask" && req.FromNodeID != "" && sourceNodeType != "andGateway" && sourceNodeType != "xorGateway" {
+		if existingID, ok := findExistingOutgoingTargetNodeIDOfType(graph.Edges, instanceNodes, req.FromNodeID, req.NormalizedNodeType); ok {
+			targetNodeID = existingID
+			reusedNode = true
+		}
+	}
+
 	if req.NormalizedNodeType == "userTask" {
 		if existingID, ok := findUserTaskNodeForRole(instanceNodes, req.AssignedRole, req.AssignedRoleLabel); ok {
 			targetNodeID = existingID
@@ -231,4 +246,32 @@ func nodeInstanceID(node map[string]any) string {
 		return ""
 	}
 	return value
+}
+
+func findExistingOutgoingTargetNodeIDOfType(edges, nodes []map[string]any, sourceID, targetType string) (string, bool) {
+	sourceID = strings.TrimSpace(sourceID)
+	if sourceID == "" {
+		return "", false
+	}
+	targetType = strings.TrimSpace(targetType)
+	for _, edge := range edges {
+		source, _ := edge["source"].(string)
+		if source != sourceID {
+			continue
+		}
+		target, _ := edge["target"].(string)
+		target = strings.TrimSpace(target)
+		if target == "" {
+			continue
+		}
+		node := findNodeByID(nodes, target)
+		if node == nil {
+			continue
+		}
+		nodeType, _ := node["type"].(string)
+		if targetType == "" || nodeType == targetType {
+			return target, true
+		}
+	}
+	return "", false
 }

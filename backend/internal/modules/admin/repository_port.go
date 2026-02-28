@@ -3,9 +3,9 @@ package admin
 import (
 	"context"
 
-	"triage-flow-forge/backend/internal/platform/db/postgres"
+	"triage-flow-forge/backend/internal/modules/contracts"
 )
 
 type Repository interface {
-	CreateUser(ctx context.Context, req postgres.AdminCreateUserRequest) (postgres.AdminCreateUserResponse, error)
+	CreateUser(ctx context.Context, req contracts.AdminCreateUserRequest) (contracts.AdminCreateUserResponse, error)
 }

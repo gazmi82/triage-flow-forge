@@ -124,6 +124,34 @@ export const apiClient = {
     };
   },
 
+  async deleteTask(taskId: string): Promise<{
+    tasks: Task[];
+    savedTasks: SavedTaskRecord[];
+    graph: DesignerGraphPayload;
+    instances: ProcessInstance[];
+    audit: AuditEvent[];
+  }> {
+    const response = await fetch(endpoint(`/api/tasks/${encodeURIComponent(taskId)}`), {
+      method: "DELETE",
+      credentials: "include",
+      headers: {
+        Accept: "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(await parseErrorMessage(response));
+    }
+
+    return (await response.json()) as {
+      tasks: Task[];
+      savedTasks: SavedTaskRecord[];
+      graph: DesignerGraphPayload;
+      instances: ProcessInstance[];
+      audit: AuditEvent[];
+    };
+  },
+
   async fetchWorkflowBootstrap(): Promise<WorkflowBootstrapPayload> {
     const response = await fetch(endpoint("/api/workflow/bootstrap"), {
       method: "GET",
