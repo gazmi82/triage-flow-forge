@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/jackc/pgx/v5"
+	"triage-flow-forge/backend/internal/platform/db/postgres/taskdesigner"
 )
 
 func (c *Client) DeleteTask(ctx context.Context, taskID string) (TaskMutationResponse, error) {
@@ -128,7 +129,7 @@ FOR UPDATE
 	removedNodeIDs := make(map[string]struct{})
 	for _, node := range graph.Nodes {
 		nodeID, _ := node["id"].(string)
-		if nodeBelongsToInstance(node, instanceID) {
+		if taskdesigner.NodeBelongsToInstance(node, instanceID) {
 			if nodeID != "" {
 				removedNodeIDs[nodeID] = struct{}{}
 			}

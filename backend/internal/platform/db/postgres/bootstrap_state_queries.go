@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"triage-flow-forge/backend/internal/platform/db/postgres/taskcreation"
+	"triage-flow-forge/backend/internal/platform/db/postgres/taskdesigner"
 )
 
 func (c *Client) fetchSavedTasks(ctx context.Context) ([]SavedTaskRecord, error) {
@@ -192,7 +193,7 @@ ORDER BY updated_at DESC
 		if nodeType == "userTask" && nodeID != "" {
 			key := instanceID + "::" + nodeID
 			if task, ok := latestByInstanceNode[key]; ok {
-				data["taskStatus"] = normalizeDesignerTaskStatus(task.Status)
+				data["taskStatus"] = taskdesigner.NormalizeTaskStatus(task.Status)
 				data["runtimeActive"] = task.Status == "claimed"
 				if task.TriageColor != "" {
 					data["triageColor"] = task.TriageColor
@@ -229,7 +230,7 @@ ORDER BY updated_at DESC
 					continue
 				}
 				pos, _ := node["position"].(map[string]any)
-				x, ok := numberAsFloat(pos["x"])
+				x, ok := taskdesigner.NumberAsFloat(pos["x"])
 				if !ok {
 					continue
 				}
@@ -239,7 +240,7 @@ ORDER BY updated_at DESC
 					firstNodeID = nodeID
 				}
 			}
-			if firstNodeID != "" && !edgeExists(graph.Edges, startID, firstNodeID) {
+			if firstNodeID != "" && !taskdesigner.EdgeExists(graph.Edges, startID, firstNodeID) {
 				graph.Edges = append(graph.Edges, map[string]any{
 					"id":        fmt.Sprintf("edge-%s-%s", startID, firstNodeID),
 					"source":    startID,
