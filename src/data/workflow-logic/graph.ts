@@ -1,5 +1,5 @@
 import { ROLE_LABELS } from "@/data/constants";
-import type { DesignerGraphPayload, SavedTaskRecord, Task } from "@/data/mockData";
+import type { DesignerGraphPayload, SavedTaskRecord, Task } from "@/data/contracts";
 import { buildBpmnNodeData } from "@/data/workflow-logic/node-data";
 import { deepClone, INITIAL_DESIGNER_GRAPH } from "@/data/workflow-logic/shared";
 

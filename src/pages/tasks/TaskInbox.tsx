@@ -1,7 +1,7 @@
 import { CheckCircle2, Search } from "lucide-react";
 import { Button, Input, PriorityBadge, RoleBadge, StatusBadge, TriageBadge } from "@/components/ui";
 import { cn } from "@/lib";
-import type { Task } from "@/data/mockData";
+import type { Task } from "@/data/contracts";
 import { SlaTimer } from "@/pages/tasks/SlaTimer";
 
 const getDisplayPatientName = (value: string) => {

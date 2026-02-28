@@ -1,6 +1,6 @@
 BEGIN;
 
--- Temporary seed credentials aligned with mockData.json.
+-- Temporary seed credentials aligned with bootstrap payload/user fixtures.
 -- NOTE: replace plain values with bcrypt hashes before production use.
 INSERT INTO credentials (user_id, email, password_hash, hash_algorithm)
 VALUES

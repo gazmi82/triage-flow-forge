@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Button, Input, Label } from "@/components/ui";
 import { ROLE_LABELS } from "@/data/constants";
-import type { Role } from "@/data/mockData";
+import type { Role } from "@/data/contracts";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui";
 import type { TaskNodeType } from "@/pages/tasks/types";
 

@@ -7,7 +7,7 @@ import { Activity, Eye, RotateCcw, AlertCircle, CheckCircle2, Loader2, PauseCirc
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { bootstrapWorkflowThunk } from "@/store/slices/workflowSlice";
 import { useSearchParams } from "react-router-dom";
-import type { ProcessInstance, Task } from "@/data/mockData";
+import type { ProcessInstance, Task } from "@/data/contracts";
 
 const STATUS_ICONS = {
   active: <Loader2 className="h-4 w-4 text-success animate-spin" />,

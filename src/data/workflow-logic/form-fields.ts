@@ -1,4 +1,4 @@
-import type { FormField, Role } from "@/data/mockData";
+import type { FormField, Role } from "@/data/contracts";
 
 const TRIAGE_OPTIONS = ["Immediate", "Very urgent", "Urgent", "Standard", "Non-urgent"];
 

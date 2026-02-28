@@ -5,19 +5,13 @@ import type {
   AuditEvent,
   CreateTaskFromConsolePayload,
   DesignerGraphPayload,
+  DraftRecord,
   ProcessInstance,
   SavedTaskRecord,
   Task,
   TriageColor,
   WorkflowBootstrapPayload,
-} from "@/data/mockData";
-
-const normalizeBoolean = (value: string | undefined): boolean => {
-  if (!value) return false;
-  return ["1", "true", "yes", "on"].includes(value.toLowerCase());
-};
-
-export const useRealApi = normalizeBoolean(import.meta.env.VITE_USE_REAL_API);
+} from "@/data/contracts";
 
 const rawBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
 const apiBaseUrl = rawBaseUrl && rawBaseUrl.length > 0 ? rawBaseUrl.replace(/\/+$/, "") : "";
@@ -301,5 +295,48 @@ export const apiClient = {
     }
 
     return (await response.json()) as DesignerGraphPayload;
+  },
+
+  async fetchDrafts(): Promise<DraftRecord[]> {
+    const bootstrap = await apiClient.fetchWorkflowBootstrap();
+    return bootstrap.drafts;
+  },
+
+  async saveDraft(payload: DesignerGraphPayload): Promise<{ graph: DesignerGraphPayload; drafts: DraftRecord[] }> {
+    const response = await fetch(endpoint("/api/workflow/drafts"), {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      throw new Error(await parseErrorMessage(response));
+    }
+
+    return (await response.json()) as { graph: DesignerGraphPayload; drafts: DraftRecord[] };
+  },
+
+  async publishDesignerGraph(
+    payload: DesignerGraphPayload
+  ): Promise<{ graph: DesignerGraphPayload; tasks: Task[]; instances: ProcessInstance[] }> {
+    const response = await fetch(endpoint("/api/workflow/publish"), {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      throw new Error(await parseErrorMessage(response));
+    }
+
+    return (await response.json()) as { graph: DesignerGraphPayload; tasks: Task[]; instances: ProcessInstance[] };
   },
 };

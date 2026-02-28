@@ -59,7 +59,7 @@ const DOC_GROUPS: DocGroup[] = [
           {
             heading: "Business Scope",
             body: [
-              "The current implementation is a realistic mock runtime intended to validate business logic and UX before backend hardening.",
+              "The current implementation is a realistic in-memory runtime intended to validate business logic and UX before backend hardening.",
               "It already covers task ownership, save/complete flows, branch routing (XOR/AND), SLA pressure, audit timeline generation, and saved history views.",
               "The system supports instance-scoped graph rendering, ensuring one patient instance cannot pollute another process visualization.",
               "Data contracts and API modules are separated by domain (`read`, `task`, `designer`, `auth`) to support future replacement with real services.",
@@ -87,7 +87,7 @@ const DOC_GROUPS: DocGroup[] = [
       {
         id: "architecture-snapshot",
         title: "Architecture Snapshot",
-        summary: "High-level structure of UI, state, and mock API domains.",
+        summary: "High-level structure of UI, state, and in-memory API domains.",
         sections: [
           {
             heading: "Frontend",
@@ -100,7 +100,7 @@ const DOC_GROUPS: DocGroup[] = [
             heading: "State and Data",
             body: [
               "Redux Toolkit stores auth, workflow graph, instances, tasks, and saved records.",
-              "React Query bootstraps data from a modular mock API split by domain.",
+              "React Query bootstraps data from a modular in-memory API split by domain.",
             ],
           },
         ],
@@ -258,7 +258,7 @@ const DOC_GROUPS: DocGroup[] = [
               "Client transport: `src/data/apiClient.ts`, `src/data/appApi.ts`.",
               "Backend routing: `backend/internal/transport/http/router.go`.",
               "Backend persistence logic: `backend/internal/platform/db/postgres/task_creation.go`, `tasks.go`, `models.go`.",
-              "Schema and contract references: `backend/triage.sql`, `workflow.definition.json`, `src/data/mockData.ts`.",
+              "Schema and contract references: `backend/triage.sql`, `workflow.definition.json`, `src/data/contracts.ts`.",
             ],
           },
         ],
@@ -391,8 +391,8 @@ const DOC_GROUPS: DocGroup[] = [
             heading: "Rule Set 3: Data Integrity",
             body: [
               "Workflow state normalizes API payloads and applies typed thunks for safer reducer handling.",
-              "Mock API state modules isolate read/designer/task/auth concerns for maintainable evolution.",
-              "This separation is deliberate groundwork for replacing mock layers with backend services.",
+              "In-memory API state modules isolate read/designer/task/auth concerns for maintainable evolution.",
+              "This separation is deliberate groundwork for replacing in-memory layers with backend services.",
             ],
           },
         ],
@@ -402,7 +402,7 @@ const DOC_GROUPS: DocGroup[] = [
             title: "Diagram Area C1: End-to-End Runtime Loop",
             focus: "Closed loop from user action to updated UI state.",
             map: [
-              "User action -> thunk -> mock API mutation -> Redux update -> UI rerender",
+              "User action -> thunk -> in-memory API mutation -> Redux update -> UI rerender",
               "                           |-> audit append -> timeline visibility",
             ],
             details: [

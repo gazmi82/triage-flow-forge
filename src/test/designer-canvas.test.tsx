@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 import { DesignerCanvas } from "@/components/designer/DesignerCanvas";
 import { createAppStore } from "@/store";
 
-interface MockReactFlowProps {
+interface ReactFlowStubProps {
   children?: React.ReactNode;
   nodes: unknown[];
   nodesDraggable?: boolean;
@@ -14,7 +14,7 @@ interface MockReactFlowProps {
 }
 
 vi.mock("@xyflow/react", async () => {
-  const ReactFlow = ({ children, nodes, nodesDraggable, nodesConnectable, elementsSelectable }: MockReactFlowProps) => {
+  const ReactFlow = ({ children, nodes, nodesDraggable, nodesConnectable, elementsSelectable }: ReactFlowStubProps) => {
     return (
       <div
         data-testid="react-flow"

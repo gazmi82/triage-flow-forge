@@ -8,91 +8,91 @@ import type {
   Task,
   User,
   WorkflowBootstrapPayload,
-} from "@/data/mockData";
+} from "@/data/contracts";
 import {
   INITIAL_DESIGNER_GRAPH,
   buildInstanceDesignerGraph,
   deepClone,
   projectDesignerGraphByInstance,
 } from "@/data/workflowLogic";
-import { ensureInitialized, mockStore, sleep } from "@/data/api/state";
+import { ensureInitialized, inMemoryStore, sleep } from "@/data/api/state";
 
 export const readApi = {
   async fetchBootstrapData(): Promise<WorkflowBootstrapPayload> {
     await ensureInitialized();
     await sleep();
     return {
-      users: deepClone(mockStore.users),
-      definitions: deepClone(mockStore.definitions),
-      instances: deepClone(mockStore.instances),
-      tasks: deepClone(mockStore.tasks),
-      savedTasks: deepClone(mockStore.savedTasks),
-      audit: deepClone(mockStore.audit),
-      graph: deepClone(mockStore.designerGraph),
-      drafts: deepClone(mockStore.drafts),
+      users: deepClone(inMemoryStore.users),
+      definitions: deepClone(inMemoryStore.definitions),
+      instances: deepClone(inMemoryStore.instances),
+      tasks: deepClone(inMemoryStore.tasks),
+      savedTasks: deepClone(inMemoryStore.savedTasks),
+      audit: deepClone(inMemoryStore.audit),
+      graph: deepClone(inMemoryStore.designerGraph),
+      drafts: deepClone(inMemoryStore.drafts),
     };
   },
 
   async fetchUsers(): Promise<User[]> {
     await ensureInitialized();
     await sleep();
-    return deepClone(mockStore.users);
+    return deepClone(inMemoryStore.users);
   },
 
   async fetchDefinitions(): Promise<ProcessDefinition[]> {
     await ensureInitialized();
     await sleep();
-    return deepClone(mockStore.definitions);
+    return deepClone(inMemoryStore.definitions);
   },
 
   async fetchInstances(): Promise<ProcessInstance[]> {
     await ensureInitialized();
     await sleep();
-    return deepClone(mockStore.instances);
+    return deepClone(inMemoryStore.instances);
   },
 
   async fetchTasks(): Promise<Task[]> {
     await ensureInitialized();
     await sleep();
-    return deepClone(mockStore.tasks);
+    return deepClone(inMemoryStore.tasks);
   },
 
   async fetchSavedTasks(): Promise<SavedTaskRecord[]> {
     await ensureInitialized();
     await sleep();
-    return deepClone(mockStore.savedTasks);
+    return deepClone(inMemoryStore.savedTasks);
   },
 
   async fetchAudit(): Promise<AuditEvent[]> {
     await ensureInitialized();
     await sleep();
-    return deepClone(mockStore.audit);
+    return deepClone(inMemoryStore.audit);
   },
 
   async fetchDesignerGraph(): Promise<DesignerGraphPayload> {
     await ensureInitialized();
     await sleep();
-    return deepClone(mockStore.designerGraph);
+    return deepClone(inMemoryStore.designerGraph);
   },
 
   async fetchTaskDesignerGraph(taskId: string): Promise<DesignerGraphPayload> {
     await ensureInitialized();
     await sleep();
-    const task = mockStore.savedTasks.find((item) => item.id === taskId) ?? mockStore.tasks.find((item) => item.id === taskId);
+    const task = inMemoryStore.savedTasks.find((item) => item.id === taskId) ?? inMemoryStore.tasks.find((item) => item.id === taskId);
     if (!task) {
       return deepClone(INITIAL_DESIGNER_GRAPH);
     }
-    const projected = projectDesignerGraphByInstance(mockStore.designerGraph, task.instanceId);
+    const projected = projectDesignerGraphByInstance(inMemoryStore.designerGraph, task.instanceId);
     if (projected.nodes.length > 0) {
       return projected;
     }
-    const instanceTasks = mockStore.savedTasks.filter((item) => item.instanceId === task.instanceId);
+    const instanceTasks = inMemoryStore.savedTasks.filter((item) => item.instanceId === task.instanceId);
     return buildInstanceDesignerGraph(instanceTasks);
   },
 
   async fetchDrafts(): Promise<DraftRecord[]> {
     await ensureInitialized();
     await sleep();
-    return deepClone(mockStore.drafts);
+    return deepClone(inMemoryStore.drafts);
   },
 };

@@ -6,10 +6,10 @@ import Tasks from "@/pages/Tasks";
 import { createAppStore } from "@/store";
 import { bootstrapWorkflowThunk, createTaskFromConsoleThunk } from "@/store/slices/workflowSlice";
 import { restoreSession } from "@/store/slices/authSlice";
-import { mockStore } from "@/data/api/state";
-import type { MockDataSeed } from "@/data/mockData";
+import { inMemoryStore } from "@/data/api/state";
+import type { BootstrapSeed } from "@/data/contracts";
 
-const seed: MockDataSeed = {
+const seed: BootstrapSeed = {
   users: [
     {
       id: "u3",
@@ -52,13 +52,13 @@ const seed: MockDataSeed = {
   audit: [],
 };
 
-vi.mock("@/data/mockSeedApi", () => ({
-  fetchMockSeed: async () => seed,
+vi.mock("@/data/bootstrapSeedApi", () => ({
+  fetchBootstrapSeed: async () => seed,
 }));
 
 describe("Tasks form validation", () => {
   it("shows errors and blocks completion when required fields are missing", async () => {
-    mockStore.initialized = false;
+    inMemoryStore.initialized = false;
     const store = createAppStore();
     store.dispatch(
       restoreSession({

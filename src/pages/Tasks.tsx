@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Activity, CheckCircle2, Clock, User } from "lucide-react";
 import { ROLE_LABELS } from "@/data/constants";
-import { type Role, type Task, type TriageColor } from "@/data/mockData";
+import { type Role, type Task, type TriageColor } from "@/data/contracts";
 import { useToast, useAuth } from "@/hooks";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import {

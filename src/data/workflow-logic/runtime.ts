@@ -1,4 +1,4 @@
-import type { DesignerGraphPayload, TaskStatus } from "@/data/mockData";
+import type { DesignerGraphPayload, TaskStatus } from "@/data/contracts";
 import { projectDesignerGraphByInstance } from "@/data/workflow-logic/graph";
 
 export interface RuntimeEngineEvent {

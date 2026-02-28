@@ -1,4 +1,4 @@
-import type { Task } from "@/data/mockData";
+import type { Task } from "@/data/contracts";
 
 type FormField = Task["formFields"][number];
 type FormValues = Record<string, string | boolean>;

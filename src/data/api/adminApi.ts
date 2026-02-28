@@ -1,11 +1,11 @@
-import type { AdminCreateUserRequest, AdminCreateUserResponse, User } from "@/data/mockData";
+import type { AdminCreateUserRequest, AdminCreateUserResponse, User } from "@/data/contracts";
 import { deepClone } from "@/data/workflowLogic";
-import { ensureInitialized, mockStore, sleep } from "@/data/api/state";
+import { ensureInitialized, inMemoryStore, sleep } from "@/data/api/state";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const buildNextUserId = (): string => {
-  const maxSuffix = mockStore.users.reduce((max, user) => {
+  const maxSuffix = inMemoryStore.users.reduce((max, user) => {
     const match = /^u(\d+)$/.exec(user.id.trim());
     if (!match) return max;
     const parsed = Number(match[1]);
@@ -37,7 +37,7 @@ export const adminApi = {
       throw new Error("Password must be at least 6 characters.");
     }
 
-    const emailExists = mockStore.users.some((user) => user.email.toLowerCase() === email);
+    const emailExists = inMemoryStore.users.some((user) => user.email.toLowerCase() === email);
     if (emailExists) {
       throw new Error("A user with this email already exists.");
     }
@@ -51,11 +51,11 @@ export const adminApi = {
       active: payload.active ?? true,
     };
 
-    mockStore.users = [...mockStore.users, newUser];
-    mockStore.credentials = [...mockStore.credentials, { email, password, userId: newUser.id }];
+    inMemoryStore.users = [...inMemoryStore.users, newUser];
+    inMemoryStore.credentials = [...inMemoryStore.credentials, { email, password, userId: newUser.id }];
 
     return {
-      users: deepClone(mockStore.users),
+      users: deepClone(inMemoryStore.users),
       createdUser: deepClone(newUser),
     };
   },

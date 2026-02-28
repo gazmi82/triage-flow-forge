@@ -1,5 +1,5 @@
 import { createAsyncThunk, createSlice, type PayloadAction } from "@reduxjs/toolkit";
-import type { AuthPayload, Role } from "@/data/mockData";
+import type { AuthPayload, Role } from "@/data/contracts";
 import { appApi } from "@/data/appApi";
 
 const SESSION_KEY = "triage.auth.user";

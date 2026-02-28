@@ -1,4 +1,4 @@
-import type { AuditEvent, CreateTaskFromConsolePayload, DesignerGraphPayload, ProcessInstance, SavedTaskRecord, Task } from "@/data/mockData";
+import type { AuditEvent, CreateTaskFromConsolePayload, DesignerGraphPayload, ProcessInstance, SavedTaskRecord, Task } from "@/data/contracts";
 import { BPMN_SUPPORTED_EDGE_TYPES } from "@/data/constants";
 import {
   applyRuntimeStateForInstance,
@@ -14,10 +14,10 @@ import {
   triageColorToSlaMinutes,
   upsertSavedTask,
 } from "@/data/workflowLogic";
-import { ensureInitialized, mockStore, sleep } from "@/data/api/state";
+import { ensureInitialized, inMemoryStore, sleep } from "@/data/api/state";
 
 const getPreferredCurrentNodeForInstance = (instanceId: string): string | null => {
-  const openTasks = mockStore.tasks.filter((task) => task.instanceId === instanceId && task.status !== "completed");
+  const openTasks = inMemoryStore.tasks.filter((task) => task.instanceId === instanceId && task.status !== "completed");
   if (openTasks.length === 0) return null;
 
   const score = (task: Task) => {
@@ -63,7 +63,7 @@ export async function createTaskFromConsole(payload: CreateTaskFromConsolePayloa
   const timestamp = Date.now();
   const instanceId = payload.instanceId && payload.instanceId.trim().length > 0 ? payload.instanceId : `pi-flow-${timestamp}`;
   const newNodeId = `node-${timestamp}`;
-  const instanceNodes = mockStore.designerGraph.nodes.filter((node) => node.data.instanceId === instanceId);
+  const instanceNodes = inMemoryStore.designerGraph.nodes.filter((node) => node.data.instanceId === instanceId);
   const existingRoleNode =
     payload.nodeType === "userTask"
       ? instanceNodes.find(
@@ -86,10 +86,10 @@ export async function createTaskFromConsole(payload: CreateTaskFromConsolePayloa
 
   const sourceNodeId = payload.fromNodeId ?? startNode?.id;
   const sourceNode = sourceNodeId
-    ? [...mockStore.designerGraph.nodes].find((node) => node.id === sourceNodeId)
+    ? [...inMemoryStore.designerGraph.nodes].find((node) => node.id === sourceNodeId)
     : undefined;
   const outgoingCountFromSource = sourceNodeId
-    ? mockStore.designerGraph.edges.filter((edge) => edge.source === sourceNodeId).length
+    ? inMemoryStore.designerGraph.edges.filter((edge) => edge.source === sourceNodeId).length
     : 0;
 
   const getNodeSize = (nodeType: CreateTaskFromConsolePayload["nodeType"]) => {
@@ -185,8 +185,8 @@ export async function createTaskFromConsole(payload: CreateTaskFromConsolePayloa
   const edgesToAdd: DesignerGraphPayload["edges"] = [];
   const resolvedSource = sourceNodeId ?? (nodesToAdd.find((n) => n.id === `start-${instanceId}`)?.id ?? null);
   if (resolvedSource && resolvedSource !== targetNodeId) {
-    const sourceNodeForLabel = mockStore.designerGraph.nodes.find((node) => node.id === resolvedSource);
-    const outgoingCount = mockStore.designerGraph.edges.filter((edge) => edge.source === resolvedSource).length;
+    const sourceNodeForLabel = inMemoryStore.designerGraph.nodes.find((node) => node.id === resolvedSource);
+    const outgoingCount = inMemoryStore.designerGraph.edges.filter((edge) => edge.source === resolvedSource).length;
     const xorConditions =
       sourceNodeForLabel?.type === "xorGateway" && typeof sourceNodeForLabel.data?.conditionExpression === "string"
         ? sourceNodeForLabel.data.conditionExpression
@@ -208,7 +208,7 @@ export async function createTaskFromConsole(payload: CreateTaskFromConsolePayloa
           : "bottom"
         : undefined;
 
-    const edgeAlreadyExists = mockStore.designerGraph.edges.some(
+    const edgeAlreadyExists = inMemoryStore.designerGraph.edges.some(
       (edge) => edge.source === resolvedSource && edge.target === targetNodeId
     );
     if (!edgeAlreadyExists) {
@@ -233,10 +233,10 @@ export async function createTaskFromConsole(payload: CreateTaskFromConsolePayloa
     }
   }
 
-  mockStore.designerGraph = {
-    ...mockStore.designerGraph,
-    nodes: [...mockStore.designerGraph.nodes, ...nodesToAdd],
-    edges: [...mockStore.designerGraph.edges, ...edgesToAdd],
+  inMemoryStore.designerGraph = {
+    ...inMemoryStore.designerGraph,
+    nodes: [...inMemoryStore.designerGraph.nodes, ...nodesToAdd],
+    edges: [...inMemoryStore.designerGraph.edges, ...edgesToAdd],
   };
 
   if (payload.nodeType === "userTask") {
@@ -245,11 +245,11 @@ export async function createTaskFromConsole(payload: CreateTaskFromConsolePayloa
     const triageCategory = triageColorToCategory(triageColor);
     const baseSlaMinutes = triageColorToSlaMinutes(triageColor);
     const dueAt = new Date(Date.now() + baseSlaMinutes * 60 * 1000).toISOString();
-    const defaultAssignee = getDefaultAssigneeForRole(mockStore.users, payload.assignedRole);
-    const existingTaskIndex = mockStore.tasks.findIndex(
+    const defaultAssignee = getDefaultAssigneeForRole(inMemoryStore.users, payload.assignedRole);
+    const existingTaskIndex = inMemoryStore.tasks.findIndex(
       (task) => task.instanceId === instanceId && task.nodeId === targetNodeId
     );
-    const existingTask = existingTaskIndex >= 0 ? mockStore.tasks[existingTaskIndex] : null;
+    const existingTask = existingTaskIndex >= 0 ? inMemoryStore.tasks[existingTaskIndex] : null;
     const createdTask: Task = {
       id: existingTask?.id ?? `t-${targetNodeId}`,
       nodeId: targetNodeId,
@@ -274,16 +274,16 @@ export async function createTaskFromConsole(payload: CreateTaskFromConsolePayloa
     };
 
     if (existingTaskIndex >= 0) {
-      const nextTasks = [...mockStore.tasks];
+      const nextTasks = [...inMemoryStore.tasks];
       nextTasks[existingTaskIndex] = createdTask;
-      mockStore.tasks = nextTasks;
+      inMemoryStore.tasks = nextTasks;
     } else {
-      mockStore.tasks = [createdTask, ...mockStore.tasks];
+      inMemoryStore.tasks = [createdTask, ...inMemoryStore.tasks];
     }
 
-    mockStore.designerGraph = {
-      ...mockStore.designerGraph,
-      nodes: mockStore.designerGraph.nodes.map((node) =>
+    inMemoryStore.designerGraph = {
+      ...inMemoryStore.designerGraph,
+      nodes: inMemoryStore.designerGraph.nodes.map((node) =>
         node.id === targetNodeId
           ? {
               ...node,
@@ -296,9 +296,9 @@ export async function createTaskFromConsole(payload: CreateTaskFromConsolePayloa
           : node
       ),
     };
-    mockStore.savedTasks = upsertSavedTask(mockStore.savedTasks, createdTask, "open");
+    inMemoryStore.savedTasks = upsertSavedTask(inMemoryStore.savedTasks, createdTask, "open");
 
-    mockStore.audit = [
+    inMemoryStore.audit = [
       {
         id: `ae-${Date.now()}`,
         instanceId: createdTask.instanceId,
@@ -321,7 +321,7 @@ export async function createTaskFromConsole(payload: CreateTaskFromConsolePayloa
         nodeName: createdTask.name,
         payload: { source: "task_console", autoClaimed: true },
       },
-      ...mockStore.audit,
+      ...inMemoryStore.audit,
     ];
   } else {
     const eventType =
@@ -335,7 +335,7 @@ export async function createTaskFromConsole(payload: CreateTaskFromConsolePayloa
               ? "gateway_passed"
               : null;
     if (eventType) {
-      mockStore.audit = [
+      inMemoryStore.audit = [
         {
           id: `ae-${Date.now()}`,
           instanceId,
@@ -352,15 +352,15 @@ export async function createTaskFromConsole(payload: CreateTaskFromConsolePayloa
             nodeType: payload.nodeType,
           },
         },
-        ...mockStore.audit,
+        ...inMemoryStore.audit,
       ];
     }
   }
 
-  if (!mockStore.instances.some((instance) => instance.id === instanceId)) {
+  if (!inMemoryStore.instances.some((instance) => instance.id === instanceId)) {
     const nodeLabel = existingRoleNode ? String(existingRoleNode.data.label ?? payload.label) : payload.label;
-    mockStore.instances = [
-      ...mockStore.instances,
+    inMemoryStore.instances = [
+      ...inMemoryStore.instances,
       {
         id: instanceId,
         definitionId: "def1",
@@ -376,19 +376,19 @@ export async function createTaskFromConsole(payload: CreateTaskFromConsolePayloa
     ];
   } else {
     const nodeLabel = existingRoleNode ? String(existingRoleNode.data.label ?? payload.label) : payload.label;
-    mockStore.instances = mockStore.instances.map((instance) =>
+    inMemoryStore.instances = inMemoryStore.instances.map((instance) =>
       instance.id === instanceId ? { ...instance, currentNode: nodeLabel } : instance
     );
   }
 
   const taskStatusByNodeId = new Map(
-    mockStore.tasks
+    inMemoryStore.tasks
       .filter((item) => item.instanceId === instanceId && item.nodeId)
       .map((item) => [item.nodeId as string, item.status])
   );
-  const runtime = applyRuntimeStateForInstance(mockStore.designerGraph, instanceId, taskStatusByNodeId);
-  mockStore.designerGraph = runtime.graph;
-  mockStore.instances = mockStore.instances.map((instance) =>
+  const runtime = applyRuntimeStateForInstance(inMemoryStore.designerGraph, instanceId, taskStatusByNodeId);
+  inMemoryStore.designerGraph = runtime.graph;
+  inMemoryStore.instances = inMemoryStore.instances.map((instance) =>
     instance.id === instanceId
       ? {
           ...instance,
@@ -401,11 +401,11 @@ export async function createTaskFromConsole(payload: CreateTaskFromConsolePayloa
   );
 
   return {
-    tasks: deepClone(mockStore.tasks),
-    savedTasks: deepClone(mockStore.savedTasks),
-    graph: projectDesignerGraphByInstance(mockStore.designerGraph, instanceId),
-    instances: deepClone(mockStore.instances),
-    audit: deepClone(mockStore.audit),
+    tasks: deepClone(inMemoryStore.tasks),
+    savedTasks: deepClone(inMemoryStore.savedTasks),
+    graph: projectDesignerGraphByInstance(inMemoryStore.designerGraph, instanceId),
+    instances: deepClone(inMemoryStore.instances),
+    audit: deepClone(inMemoryStore.audit),
     createdNodeId: targetNodeId,
     instanceId,
   };

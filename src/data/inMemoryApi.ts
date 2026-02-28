@@ -4,7 +4,7 @@ import { designerApi } from "@/data/api/designerApi";
 import { readApi } from "@/data/api/readApi";
 import { taskApi } from "@/data/api/taskApi";
 
-export const mockApi = {
+export const inMemoryApi = {
   ...readApi,
   ...designerApi,
   ...taskApi,

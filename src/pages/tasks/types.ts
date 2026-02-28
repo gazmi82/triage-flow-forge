@@ -1,4 +1,4 @@
-import type { DesignerGraphPayload } from "@/data/mockData";
+import type { DesignerGraphPayload } from "@/data/contracts";
 
 export type TaskNodeType = DesignerGraphPayload["nodes"][number]["type"];
 

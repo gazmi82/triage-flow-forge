@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { publishDesignerThunk, saveDraftThunk } from "@/store/slices/workflowSlice";
 import { validateDesignerGraphPayload } from "@/data/bpmnValidation";
-import type { DesignerGraphEdge, DesignerGraphNode, DesignerGraphPayload } from "@/data/mockData";
+import type { DesignerGraphEdge, DesignerGraphNode, DesignerGraphPayload } from "@/data/contracts";
 
 export function DesignerToolbar() {
   const [saved, setSaved] = useState(false);

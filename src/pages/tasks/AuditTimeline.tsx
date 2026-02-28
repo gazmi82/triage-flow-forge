@@ -2,7 +2,7 @@ import { Activity, AlertTriangle, CheckCircle2, ChevronRight, Clock, Milestone, 
 import type { ReactNode } from "react";
 import { RoleBadge } from "@/components/ui";
 import { formatTime } from "@/lib";
-import type { AuditEvent } from "@/data/mockData";
+import type { AuditEvent } from "@/data/contracts";
 
 export function AuditTimeline({ instanceId, events }: { instanceId: string; events: AuditEvent[] }) {
   const instanceEvents = [...events.filter((e) => e.instanceId === instanceId)].sort(

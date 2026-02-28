@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ChevronsUpDown, CheckCircle2 } from "lucide-react";
 import { useToast } from "@/hooks";
 import { ROLE_LABELS } from "@/data/constants";
-import type { Role, Task, TriageColor } from "@/data/mockData";
+import type { Role, Task, TriageColor } from "@/data/contracts";
 import type { TaskNodeType } from "@/pages/tasks/types";
 import {
   buildRequiredFieldErrors,

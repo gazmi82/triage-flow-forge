@@ -7,7 +7,7 @@ import type {
   Role,
   TriageColor,
   User,
-} from "@/data/mockData";
+} from "@/data/contracts";
 
 const ROLE_LABEL_TO_KEY: Record<string, Role> = {
   reception: "reception",

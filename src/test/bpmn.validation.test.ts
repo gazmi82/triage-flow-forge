@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { DesignerGraphPayload } from "@/data/mockData";
+import type { DesignerGraphPayload } from "@/data/contracts";
 import { normalizeGraphForBpmnSubset, validateDesignerGraphPayload } from "@/data/bpmnValidation";
 
 const baseGraph: DesignerGraphPayload = {

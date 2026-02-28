@@ -4,14 +4,14 @@ import type {
   AuthPayload,
   DesignerGraphPayload,
   DraftRecord,
-  MockDataSeed,
+  BootstrapSeed,
   ProcessDefinition,
   ProcessInstance,
   SavedTaskRecord,
   Task,
   User,
-} from "@/data/mockData";
-import { fetchMockSeed } from "@/data/mockSeedApi";
+} from "@/data/contracts";
+import { fetchBootstrapSeed } from "@/data/bootstrapSeedApi";
 import {
   INITIAL_DESIGNER_GRAPH,
   deepClone,
@@ -22,11 +22,11 @@ import {
   triageColorToPriority,
   triageColorToSlaMinutes,
 } from "@/data/workflowLogic";
-import type { TriageColor } from "@/data/mockData";
+import type { TriageColor } from "@/data/contracts";
 
 export const sleep = (ms = 120) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export const mockStore: {
+export const inMemoryStore: {
   initialized: boolean;
   users: User[];
   definitions: ProcessDefinition[];
@@ -58,31 +58,31 @@ export const toAuthPayload = (user: User): AuthPayload => ({
   department: user.department,
 });
 
-const applySeed = (seed: MockDataSeed) => {
-  mockStore.users = deepClone(seed.users);
-  mockStore.definitions = deepClone(seed.definitions);
+const applySeed = (seed: BootstrapSeed) => {
+  inMemoryStore.users = deepClone(seed.users);
+  inMemoryStore.definitions = deepClone(seed.definitions);
   // Runtime starts empty by design; dashboard/activity should populate only from user actions.
-  mockStore.instances = [];
-  mockStore.tasks = [];
-  mockStore.audit = [];
-  mockStore.credentials = deepClone(seed.authCredentials);
-  mockStore.designerGraph = deepClone(INITIAL_DESIGNER_GRAPH);
-  mockStore.drafts = [];
-  mockStore.savedTasks = [];
+  inMemoryStore.instances = [];
+  inMemoryStore.tasks = [];
+  inMemoryStore.audit = [];
+  inMemoryStore.credentials = deepClone(seed.authCredentials);
+  inMemoryStore.designerGraph = deepClone(INITIAL_DESIGNER_GRAPH);
+  inMemoryStore.drafts = [];
+  inMemoryStore.savedTasks = [];
 };
 
 export const ensureInitialized = async () => {
-  if (mockStore.initialized) return;
-  const seed = await fetchMockSeed();
+  if (inMemoryStore.initialized) return;
+  const seed = await fetchBootstrapSeed();
   applySeed(seed);
-  mockStore.initialized = true;
+  inMemoryStore.initialized = true;
 };
 
 export const syncEmergencyTriageTasksFromDesigner = () => {
   const isTriageColor = (value: unknown): value is TriageColor =>
     value === "red" || value === "orange" || value === "yellow" || value === "green" || value === "blue";
 
-  const userTaskNodes = getOrderedUserTaskNodes(mockStore.designerGraph);
+  const userTaskNodes = getOrderedUserTaskNodes(inMemoryStore.designerGraph);
   const byInstance = new Map<string, typeof userTaskNodes>();
   userTaskNodes.forEach((node) => {
     const instanceId = typeof node.data.instanceId === "string" && node.data.instanceId.length > 0
@@ -131,12 +131,12 @@ export const syncEmergencyTriageTasksFromDesigner = () => {
 
   const affectedInstanceIds = new Set(byInstance.keys());
 
-  const unaffectedTasks = mockStore.tasks.filter((task) => !affectedInstanceIds.has(task.instanceId));
-  const unaffectedSavedTasks = mockStore.savedTasks.filter((task) => !affectedInstanceIds.has(task.instanceId));
-  const unaffectedInstances = mockStore.instances.filter((instance) => !affectedInstanceIds.has(instance.id));
+  const unaffectedTasks = inMemoryStore.tasks.filter((task) => !affectedInstanceIds.has(task.instanceId));
+  const unaffectedSavedTasks = inMemoryStore.savedTasks.filter((task) => !affectedInstanceIds.has(task.instanceId));
+  const unaffectedInstances = inMemoryStore.instances.filter((instance) => !affectedInstanceIds.has(instance.id));
 
-  mockStore.tasks = [...unaffectedTasks, ...generatedEmergencyTasks];
-  mockStore.savedTasks = [
+  inMemoryStore.tasks = [...unaffectedTasks, ...generatedEmergencyTasks];
+  inMemoryStore.savedTasks = [
     ...unaffectedSavedTasks,
     ...generatedEmergencyTasks.map((task) => ({
     ...task,
@@ -148,7 +148,7 @@ export const syncEmergencyTriageTasksFromDesigner = () => {
   const nextInstances: ProcessInstance[] = [...unaffectedInstances];
   byInstance.forEach((nodes, instanceId) => {
     const firstNodeLabel = nodes[0]?.data.label ?? "No Active User Task";
-    const existing = mockStore.instances.find((instance) => instance.id === instanceId);
+    const existing = inMemoryStore.instances.find((instance) => instance.id === instanceId);
     if (existing) {
       nextInstances.push({ ...existing, currentNode: firstNodeLabel, status: "active" });
       return;
@@ -166,7 +166,7 @@ export const syncEmergencyTriageTasksFromDesigner = () => {
       patientName: "Designer Sandbox",
     });
   });
-  mockStore.instances = nextInstances;
+  inMemoryStore.instances = nextInstances;
 
   const taskStatusByNodeId = new Map<
     string,
@@ -178,9 +178,9 @@ export const syncEmergencyTriageTasksFromDesigner = () => {
     ])
   );
 
-  mockStore.designerGraph = {
-    ...mockStore.designerGraph,
-    nodes: mockStore.designerGraph.nodes.map((node) =>
+  inMemoryStore.designerGraph = {
+    ...inMemoryStore.designerGraph,
+    nodes: inMemoryStore.designerGraph.nodes.map((node) =>
       node.type === "userTask"
         ? {
             ...node,

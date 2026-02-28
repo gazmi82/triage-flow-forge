@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { type Role } from "@/data/mockData";
+import { type Role } from "@/data/contracts";
 import { RoleBadge, StatusBadge } from "@/components/ui/Badges";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";

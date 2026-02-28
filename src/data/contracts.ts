@@ -195,7 +195,7 @@ export interface CreateTaskFromConsolePayload {
   formValues?: Record<string, string | boolean>;
 }
 
-export interface MockDataSeed {
+export interface BootstrapSeed {
   users: User[];
   authCredentials: AuthCredential[];
   definitions: ProcessDefinition[];

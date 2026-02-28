@@ -16,6 +16,7 @@ const Designer = lazy(() => import("./pages/Designer"));
 const Tasks = lazy(() => import("./pages/Tasks"));
 const Draft = lazy(() => import("./pages/Draft"));
 const SavedTasks = lazy(() => import("./pages/SavedTasks"));
+const PatientRecord = lazy(() => import("./pages/PatientRecord"));
 const Instances = lazy(() => import("./pages/Instances"));
 const Admin = lazy(() => import("./pages/Admin"));
 const Docs = lazy(() => import("./pages/Docs"));
@@ -57,6 +58,7 @@ function ProtectedApp() {
                   <Route path="/tasks" element={<Tasks />} />
                   <Route path="/draft" element={<Draft />} />
                   <Route path="/saved-tasks" element={<SavedTasks />} />
+                  <Route path="/saved-tasks/:taskId/view" element={<PatientRecord />} />
                   <Route path="/instances" element={<Instances />} />
                   <Route path="/admin" element={<Admin />} />
                   <Route path="/docs" element={<Docs />} />
@@ -69,6 +71,7 @@ function ProtectedApp() {
                   <Route path="/tasks" element={<Tasks />} />
                   <Route path="/draft" element={<Draft />} />
                   <Route path="/saved-tasks" element={<SavedTasks />} />
+                  <Route path="/saved-tasks/:taskId/view" element={<PatientRecord />} />
                   <Route path="/docs" element={<Docs />} />
                   <Route path="*" element={<Navigate to={defaultRoute} replace />} />
                 </>

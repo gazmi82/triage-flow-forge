@@ -1,4 +1,4 @@
-import type { Role } from "@/data/mockData";
+import type { Role } from "@/data/contracts";
 
 export const APP_NAV_ROUTES = ["/", "/designer", "/tasks", "/draft", "/saved-tasks", "/instances", "/admin", "/docs"] as const;
 export type AppNavRoute = (typeof APP_NAV_ROUTES)[number];

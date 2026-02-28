@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Role } from "@/data/mockData";
+import type { Role } from "@/data/contracts";
 import { InMemoryRedisStore } from "@/server/chache/store";
 import { WorkflowRedisCache } from "@/server/chache/workflowRedisCache";
 

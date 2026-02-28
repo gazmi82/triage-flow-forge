@@ -1,4 +1,4 @@
-import type { GrpcTaskMutationRequest, GrpcTaskMutationResponse, GrpcWorkflowEnvelope } from "@/data/mockData";
+import type { GrpcTaskMutationRequest, GrpcTaskMutationResponse, GrpcWorkflowEnvelope } from "@/data/contracts";
 
 export const grpcMethods = {
   claimTask: "workflow.TaskService/ClaimTask",

@@ -1,4 +1,4 @@
-import type { Role } from "@/data/mockData";
+import type { Role } from "@/data/contracts";
 import { redisKeys, type SessionRecord, type SlaDeadlineEntry } from "@/server/chache/contracts";
 import type { RedisStore } from "@/server/chache/store";
 

@@ -14,7 +14,7 @@ Object.defineProperty(window, "matchMedia", {
   }),
 });
 
-class ResizeObserverMock {
+class ResizeObserverStub {
   observe() {}
   unobserve() {}
   disconnect() {}
@@ -22,5 +22,5 @@ class ResizeObserverMock {
 
 Object.defineProperty(window, "ResizeObserver", {
   writable: true,
-  value: ResizeObserverMock,
+  value: ResizeObserverStub,
 });

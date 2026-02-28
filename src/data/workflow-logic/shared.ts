@@ -1,4 +1,4 @@
-import type { DesignerGraphPayload } from "@/data/mockData";
+import type { DesignerGraphPayload } from "@/data/contracts";
 
 export const INITIAL_DESIGNER_GRAPH: DesignerGraphPayload = {
   nodes: [],

@@ -1,4 +1,4 @@
-import type { TriageColor } from "@/data/mockData";
+import type { TriageColor } from "@/data/contracts";
 
 const TRIAGE_TO_CATEGORY: Record<TriageColor, "urgent" | "non_urgent"> = {
   red: "urgent",

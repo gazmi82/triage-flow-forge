@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/use-auth";
-import type { Role } from "@/data/mockData";
+import type { Role } from "@/data/contracts";
 import { Activity } from "lucide-react";
 
 const ROLE_OPTIONS: Array<{ value: Role; label: string }> = [
@@ -77,7 +77,7 @@ export default function Auth() {
       setRegisterError(result.error ?? "Unable to create account.");
       return;
     }
-    toast({ title: "Account created", description: "Mock account created and signed in." });
+    toast({ title: "Account created", description: "Demo account created and signed in." });
     navigate("/");
   };
 
@@ -91,10 +91,10 @@ export default function Auth() {
                 <div className="rounded-md bg-primary/10 p-1.5 text-primary">
                   <Activity className="h-4 w-4" />
                 </div>
-                <Badge variant="outline">Mock Authentication</Badge>
+                <Badge variant="outline">Demo Authentication</Badge>
               </div>
               <CardTitle className="text-xl">HospitalBPM Access</CardTitle>
-              <CardDescription>Sign in or create a mock account to continue.</CardDescription>
+              <CardDescription>Sign in or create a demo account to continue.</CardDescription>
             </CardHeader>
             <CardContent>
               <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -198,7 +198,7 @@ export default function Auth() {
 
           <Card className="hidden border-border/70 bg-card/80 md:block">
             <CardHeader>
-              <CardTitle>Mock Credentials</CardTitle>
+              <CardTitle>Demo Credentials</CardTitle>
               <CardDescription>Use any role-based account for quick access.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">

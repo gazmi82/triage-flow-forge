@@ -1,4 +1,4 @@
-import type { BpmnEdgeType, BpmnNodeType, Role } from "@/data/mockData";
+import type { BpmnEdgeType, BpmnNodeType, Role } from "@/data/contracts";
 
 export const ROLE_LABELS: Record<Role, string> = {
   reception: "Reception",

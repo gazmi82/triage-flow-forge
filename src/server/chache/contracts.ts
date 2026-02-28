@@ -1,4 +1,4 @@
-import type { Role } from "@/data/mockData";
+import type { Role } from "@/data/contracts";
 
 export interface SessionRecord {
   userId: string;

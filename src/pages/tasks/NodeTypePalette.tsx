@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, ChevronsUpDown, Circle, Clock, Diamond, Mail, Square } from "lucide-react";
 import { ROLE_LABELS } from "@/data/constants";
-import type { Role, TriageColor } from "@/data/mockData";
+import type { Role, TriageColor } from "@/data/contracts";
 import { Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui";
 import { cn } from "@/lib";
 import { getDefaultNodeLabel, type TaskNodeType } from "@/pages/tasks/types";

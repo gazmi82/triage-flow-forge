@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import type { Role, TriageColor } from "@/data/mockData";
+import type { Role, TriageColor } from "@/data/contracts";
 import { ROLE_LABELS, ROLE_COLORS } from "@/data/constants";
 
 interface RoleBadgeProps {

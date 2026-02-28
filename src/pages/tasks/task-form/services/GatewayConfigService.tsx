@@ -1,5 +1,5 @@
 import { ROLE_LABELS } from "@/data/constants";
-import type { Role } from "@/data/mockData";
+import type { Role } from "@/data/contracts";
 import type { TaskNodeType } from "@/pages/tasks/types";
 import {
   Label,

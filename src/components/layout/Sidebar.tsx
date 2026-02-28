@@ -13,7 +13,7 @@ import {
   Hospital,
   LogOut,
 } from "lucide-react";
-import type { Role } from "@/data/mockData";
+import type { Role } from "@/data/contracts";
 import { ROLE_LABELS } from "@/data/constants";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
@@ -97,7 +97,7 @@ export function Sidebar() {
         <div className="mt-2 rounded-md bg-sidebar-accent/60 px-2 py-2">
           <p className="truncate text-[10px] text-sidebar-foreground/80">{user?.email}</p>
           <div className="mt-1 flex items-center justify-between text-[9px] uppercase tracking-wider text-sidebar-foreground/60">
-            <span>Mock session</span>
+            <span>Session</span>
             <span>online</span>
           </div>
         </div>

@@ -1,126 +1,109 @@
 # Project Memory (Persistent Context)
 
-Purpose: Keep a compact, durable history of what this repo has achieved so future sessions do not need to rediscover context from scratch.
+Purpose: Keep durable project state so work can resume quickly after chat/session loss.
 
-Scope: Rewritten `main` history as of commit `63bc924` (2026-02-24).
+Last updated: 2026-02-28
 
 ## Current Product Snapshot
-- App type: Hospital emergency triage workflow simulator/manager (frontend-first, mock backend).
-- Stack: React + TypeScript + Vite + Redux Toolkit + React Query + Tailwind + shadcn/ui + React Flow + Vitest.
-Core capabilities:
-- Role-based auth and protected routing.
-- BPMN-like process designer (tasks, events, gateways).
-- Task console with claim/complete/edit and routing logic.
-- Saved tasks + draft process states + instance monitor + admin views.
-- Mock API domain split (`read`, `designer`, `task`, `auth`) with shared in-memory state.
 
-## Quick Rehydrate Map (If Chat Memory Resets)
-Check these in order:
+- Product: Hospital emergency triage workflow manager.
+- Frontend: React + TypeScript + Vite + Redux Toolkit + React Query + Tailwind + shadcn/ui + React Flow.
+- Backend: Go modular monolith with explicit service/repository ports.
+- Persistence: Postgres (system of record) + Redis (sessions/cache primitives).
 
-1. App shell + routing
-- `src/App.tsx`
-- `src/components/layout/`
-- `src/pages/Auth.tsx`
+## High-Confidence Current Behavior
 
-2. State and orchestration
+1. Auth/session
+- Login is real backend auth (`/api/auth/login`).
+- Session cookie: `triage_session`.
+- Session payload is stored in Redis as `session:<session-id>` with TTL.
+
+2. Workflow/task runtime
+- Frontend bootstraps state from `GET /api/workflow/bootstrap`.
+- Task mutations (claim/save/complete/delete/create) use backend APIs and update aggregate state.
+- Process designer view for a task is fetched from `GET /api/tasks/:taskId/designer`.
+
+3. Saved Tasks UX
+- Actions are in 3-dot menu: `Canvas`, `View`, `Delete`.
+- `View` opens new route: `/saved-tasks/:taskId/view`.
+- `Delete` restricted to closed/END-completed process instances.
+
+## Recent Architecture Changes
+
+### Backend
+- Introduced shared contracts package:
+  - `backend/internal/modules/contracts/*`
+- Refactored Postgres layer for separation of concerns:
+  - `task_creation_helpers.go` reduced and split into:
+    - `task_creation_inputs.go`
+    - `task_creation_graph.go`
+  - designer runtime logic extracted to:
+    - `backend/internal/platform/db/postgres/taskdesigner/runtime_graph.go`
+- Updated query/helper reuse from `bootstrap_state_queries.go` and `tasks_delete.go` to shared designer helpers.
+
+### Frontend
+- Saved Tasks refactored into feature module:
+  - `src/features/saved-tasks/*`
+- New static patient medical record page:
+  - `src/features/patient-record/PatientMedicalRecordPage.tsx`
+- Runtime in-memory fallback removed from transport path:
+  - `src/data/appApi.ts` now calls backend-only APIs.
+- Naming cleanup completed:
+  - `src/data/contracts.ts` is the canonical frontend contract module.
+  - `src/data/bootstrapSeedApi.ts` is the bootstrap seed loader.
+  - `src/data/inMemoryApi.ts` is the in-memory test API aggregator.
+  - `src/data/api/state.ts` exposes `inMemoryStore`.
+
+## Known Gaps / Next Critical Items
+
+1. Designer draft and publish backend routes
+- Frontend now calls:
+  - `POST /api/workflow/drafts`
+  - `POST /api/workflow/publish`
+- These routes need backend handler wiring + module implementation.
+
+2. Naming cleanup
+- Type contracts now live in `src/data/contracts.ts`.
+- Public static seed file removed; bootstrap seed now comes from backend.
+
+3. Legacy in-memory API cleanup
+- Runtime path no longer depends on any in-memory fallback; backend transport is the source of truth.
+- In-memory API modules under `src/data/api/*` are retained only for test scaffolding.
+
+## Quick Rehydrate Map (If Context Resets)
+
+1. Root docs
+- `README.md`
+- `BACKEND_NEXT_STEPS.md`
+- this file (`PROJECT_MEMORY.md`)
+
+2. Frontend runtime/data path
+- `src/data/apiClient.ts`
+- `src/data/appApi.ts`
 - `src/store/slices/workflowSlice.ts`
 - `src/store/slices/authSlice.ts`
-- `src/store/index.ts`
 
-3. Workflow domain logic
-- `src/data/workflow-logic/`
-- `src/data/workflowLogic.ts`
-- `workflow.definition.json`
+3. Saved Tasks and patient record feature
+- `src/features/saved-tasks/`
+- `src/features/patient-record/PatientMedicalRecordPage.tsx`
 
-4. Mock API and data contracts
-- `src/data/api/`
-- `src/data/mockData.ts` (types/interfaces)
-- `public/mockData.json` (seed data)
+4. Backend request flow
+- `backend/internal/app/app.go`
+- `backend/internal/transport/http/router.go`
+- `backend/internal/transport/http/router_auth_handlers.go`
+- `backend/internal/transport/http/router_task_handlers.go`
 
-5. Main product pages
-- `src/pages/Tasks.tsx`
-- `src/pages/Designer.tsx`
-- `src/pages/SavedTasks.tsx`
-- `src/pages/Instances.tsx`
-- `src/pages/Admin.tsx`
+5. Backend Postgres logic
+- `backend/internal/platform/db/postgres/`
+- `backend/internal/platform/db/postgres/taskcreation/`
+- `backend/internal/platform/db/postgres/taskdesigner/`
 
-6. Designer internals
-- `src/components/designer/`
-- `src/pages/tasks/` (form, inbox, palette, timeline)
+## Update Protocol
 
-7. Tests (behavior expectations)
-- `src/test/`
-
-## Milestones (From First Commit, Grouped by 2 Commits)
-
-### Checkpoint 01
-- `b331aa1` (2025-01-01): Project template/bootstrap created.
-- `f96d0d3` (2026-02-19): Early project changes and baseline setup iteration.
-- Outcome: Repository initialized and moved from template state to first custom code pass.
-
-### Checkpoint 02
-- `2243523` (2026-02-19): Implemented BPMN designer UI.
-- `e0ec700` (2026-02-19): Follow-up changes after initial designer implementation.
-- Outcome: Core process modeling canvas introduced and stabilized.
-
-### Checkpoint 03
-- `a9cc768` (2026-02-19): Added node shape selector.
-- `a01f348` (2026-02-19): Updated publish/site metadata.
-- Outcome: UX improvements to designer + deployment/project metadata cleanup.
-
-### Checkpoint 04
-- `c9abdb1` (2026-02-19): Fixed task validation and designer drop coordinates; added lazy routes, tests, and `workflow.definition.json`.
-- `c02231a` (2026-02-19): Added authenticated top navbar and navigation model updates.
-- Outcome: Better runtime correctness, better navigation, and test/dev structure expansion.
-
-### Checkpoint 05
-- `7912703` (2026-02-19): Additional navbar/navigation model refinement.
-- `aea34f8` (2026-02-20): Added saved tasks workspace and task-scoped redirects into process designer.
-- Outcome: Stronger user flow from task records into process context.
-
-### Checkpoint 06
-- `3e30c36` (2026-02-20): Aligned workflow definition model with current designer/task flow and permissions.
-- `73d6fa1` (2026-02-20): Small fixes.
-- Outcome: Model consistency improvements + targeted bug cleanup.
-
-### Checkpoint 07
-- `1602ed4` (2026-02-22): Refactored frontend into task-console modules; moved seed usage toward JSON; aligned workflow typing.
-- `8ec4935` (2026-02-22): Major workflow/API refactor.
-- Split mock API by domain with shared state.
-- Moved seed dataset to `public/mockData.json`.
-- Added query bootstrap integration.
-- Modularized task console components.
-- Preserved completed tasks in inbox merge logic.
-- Tightened TypeScript thunk typing.
-- Added initial gRPC contract-prep file.
-- Outcome: Architecture shifted from monolith-like frontend logic to a cleaner domain + state structure.
-
-### Checkpoint 08
-- `e5491a2` (2026-02-23): Enforced instance-scoped process graphs and improved completion UX.
-- `fd59906` (2026-02-23): Extracted task-form validation/lookup services and finalized XOR routing UX.
-- Outcome: Process/runtime integrity improved, especially around instance isolation and gateway behavior.
-
-### Checkpoint 09
-- `44e6eba` (2026-02-24): Fixed test validation.
-- `63bc924` (2026-02-24): Stabilized triage workflow state, routing, and task-console API architecture.
-- Outcome: Current stable baseline for triage workflow behavior and data-flow reliability.
-
-## Update Protocol (Every 5 New Commits)
-When there are 5 new commits on `main`, update this file immediately.
-
-1. Collect new commits:
-```bash
-git --no-pager log --oneline --decorate -n 5
-```
-2. Append next checkpoint with:
-- commit hashes + date + subject
-- 2-5 bullets of what changed (files/modules/features)
-- 1 short “Outcome” line
-4. For future entries, use 5-commit checkpoints.
-3. Update `Scope` line at top with latest commit hash/date.
-
-## Authoring Rules For Future Updates
-- Keep entries factual, not aspirational.
-- Prefer behavior-level language (what user/system can do now).
-- Mention regressions/fixes explicitly if relevant.
-- Keep each checkpoint short enough to scan in under 20 seconds.
+When major behavior/architecture shifts are made:
+1. Update `README.md` and `backend/README.md` first.
+2. Update this file with:
+- what changed
+- what is stable now
+- what remains pending
+3. Add/refresh actionable items in `BACKEND_NEXT_STEPS.md`.

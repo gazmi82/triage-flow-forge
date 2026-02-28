@@ -1,5 +1,5 @@
 import { useCallback } from "react";
-import type { Role } from "@/data/mockData";
+import type { Role } from "@/data/contracts";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { clearAuthError, loginThunk, logout, registerThunk } from "@/store/slices/authSlice";
 

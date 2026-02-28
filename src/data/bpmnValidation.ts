@@ -7,7 +7,7 @@ import type {
   EventDefinitionType,
   GatewayDirection,
   Role,
-} from "@/data/mockData";
+} from "@/data/contracts";
 import { roleLabelToKey } from "@/data/workflowLogic";
 
 type ValidationMode = "draft" | "publish";

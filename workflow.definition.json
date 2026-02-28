@@ -156,7 +156,7 @@
   },
   "stateManagement": {
     "driver": "redux_toolkit",
-    "sourceOfTruth": "public/mockData.json",
+    "sourceOfTruth": "backend:/api/bootstrap",
     "syncRules": {
       "task_console_create_to_designer": "creating node/task in task console updates designer graph immediately",
       "task_console_claim_complete_to_designer": "task status changes mirror node taskStatus",
@@ -238,7 +238,7 @@
       }
     },
     "serialization": {
-      "primary": "public/mockData.json",
+      "primary": "backend:/api/bootstrap",
       "contract": "workflow.definition.json",
       "runtimeGraph": "redux_workflow_state",
       "bpmnXmlImportExport": "planned_not_implemented"

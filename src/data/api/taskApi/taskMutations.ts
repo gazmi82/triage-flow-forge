@@ -1,4 +1,4 @@
-import type { AuditEvent, DesignerGraphPayload, ProcessInstance, SavedTaskRecord, Task, TriageColor } from "@/data/mockData";
+import type { AuditEvent, DesignerGraphPayload, ProcessInstance, SavedTaskRecord, Task, TriageColor } from "@/data/contracts";
 import {
   applyRuntimeStateForInstance,
   deepClone,
@@ -8,7 +8,7 @@ import {
   triageColorToSlaMinutes,
   upsertSavedTask,
 } from "@/data/workflowLogic";
-import { ensureInitialized, mockStore, sleep } from "@/data/api/state";
+import { ensureInitialized, inMemoryStore, sleep } from "@/data/api/state";
 
 type TaskApiResponse = {
   tasks: Task[];
@@ -19,7 +19,7 @@ type TaskApiResponse = {
 };
 
 const getPreferredCurrentNodeForInstance = (instanceId: string): string | null => {
-  const openTasks = mockStore.tasks.filter((task) => task.instanceId === instanceId && task.status !== "completed");
+  const openTasks = inMemoryStore.tasks.filter((task) => task.instanceId === instanceId && task.status !== "completed");
   if (openTasks.length === 0) return null;
 
   const score = (task: Task) => {
@@ -41,18 +41,18 @@ export async function claimTask(taskId: string, assigneeName: string): Promise<T
   await ensureInitialized();
   await sleep();
   const now = new Date().toISOString();
-  mockStore.tasks = mockStore.tasks.map((task) => (task.id === taskId ? { ...task, status: "claimed", assignee: assigneeName, updatedAt: now } : task));
+  inMemoryStore.tasks = inMemoryStore.tasks.map((task) => (task.id === taskId ? { ...task, status: "claimed", assignee: assigneeName, updatedAt: now } : task));
 
-  const task = mockStore.tasks.find((item) => item.id === taskId);
+  const task = inMemoryStore.tasks.find((item) => item.id === taskId);
   if (task?.nodeId) {
-    mockStore.designerGraph = {
-      ...mockStore.designerGraph,
-      nodes: mockStore.designerGraph.nodes.map((node) =>
+    inMemoryStore.designerGraph = {
+      ...inMemoryStore.designerGraph,
+      nodes: inMemoryStore.designerGraph.nodes.map((node) =>
         node.id === task.nodeId ? { ...node, data: { ...node.data, taskStatus: "claimed" } } : node
       ),
     };
 
-    mockStore.audit = [
+    inMemoryStore.audit = [
       {
         id: `ae-${Date.now()}`,
         instanceId: task.instanceId,
@@ -64,19 +64,19 @@ export async function claimTask(taskId: string, assigneeName: string): Promise<T
         nodeName: task.name,
         payload: { source: "task_console" },
       },
-      ...mockStore.audit,
+      ...inMemoryStore.audit,
     ];
 
-    mockStore.savedTasks = upsertSavedTask(mockStore.savedTasks, task, "open");
+    inMemoryStore.savedTasks = upsertSavedTask(inMemoryStore.savedTasks, task, "open");
 
     const taskStatusByNodeId = new Map(
-      mockStore.tasks
+      inMemoryStore.tasks
         .filter((item) => item.instanceId === task.instanceId && item.nodeId)
         .map((item) => [item.nodeId as string, item.status])
     );
-    const runtime = applyRuntimeStateForInstance(mockStore.designerGraph, task.instanceId, taskStatusByNodeId);
-    mockStore.designerGraph = runtime.graph;
-    mockStore.instances = mockStore.instances.map((instance) =>
+    const runtime = applyRuntimeStateForInstance(inMemoryStore.designerGraph, task.instanceId, taskStatusByNodeId);
+    inMemoryStore.designerGraph = runtime.graph;
+    inMemoryStore.instances = inMemoryStore.instances.map((instance) =>
       instance.id === task.instanceId
         ? {
             ...instance,
@@ -90,11 +90,11 @@ export async function claimTask(taskId: string, assigneeName: string): Promise<T
   }
 
   return {
-    tasks: deepClone(mockStore.tasks),
-    savedTasks: deepClone(mockStore.savedTasks),
-    graph: task ? projectDesignerGraphByInstance(mockStore.designerGraph, task.instanceId) : deepClone(mockStore.designerGraph),
-    instances: deepClone(mockStore.instances),
-    audit: deepClone(mockStore.audit),
+    tasks: deepClone(inMemoryStore.tasks),
+    savedTasks: deepClone(inMemoryStore.savedTasks),
+    graph: task ? projectDesignerGraphByInstance(inMemoryStore.designerGraph, task.instanceId) : deepClone(inMemoryStore.designerGraph),
+    instances: deepClone(inMemoryStore.instances),
+    audit: deepClone(inMemoryStore.audit),
   };
 }
 
@@ -106,14 +106,14 @@ export async function completeTask(
 ): Promise<TaskApiResponse> {
   await ensureInitialized();
   await sleep();
-  const completed = mockStore.tasks.find((task) => task.id === taskId);
+  const completed = inMemoryStore.tasks.find((task) => task.id === taskId);
 
   if (completed) {
     const normalizedPatientName = patientName?.trim();
     const normalizedPatientId = patientId?.trim();
     const updatedAt = new Date().toISOString();
 
-    mockStore.tasks = mockStore.tasks.map((task) =>
+    inMemoryStore.tasks = inMemoryStore.tasks.map((task) =>
       task.id === taskId
         ? {
             ...task,
@@ -126,15 +126,15 @@ export async function completeTask(
     );
 
     if (completed.nodeId) {
-      mockStore.designerGraph = {
-        ...mockStore.designerGraph,
-        nodes: mockStore.designerGraph.nodes.map((node) =>
+      inMemoryStore.designerGraph = {
+        ...inMemoryStore.designerGraph,
+        nodes: inMemoryStore.designerGraph.nodes.map((node) =>
           node.id === completed.nodeId ? { ...node, data: { ...node.data, taskStatus: "completed" } } : node
         ),
       };
     }
-    const completedSnapshot = mockStore.tasks.find((task) => task.id === taskId) ?? completed;
-    mockStore.audit = [
+    const completedSnapshot = inMemoryStore.tasks.find((task) => task.id === taskId) ?? completed;
+    inMemoryStore.audit = [
       {
         id: `ae-${Date.now()}`,
         instanceId: completed.instanceId,
@@ -146,13 +146,13 @@ export async function completeTask(
         nodeName: completed.name,
         payload: { source: "task_console" },
       },
-      ...mockStore.audit,
+      ...inMemoryStore.audit,
     ];
-    mockStore.savedTasks = upsertSavedTask(mockStore.savedTasks, { ...completedSnapshot }, "closed");
+    inMemoryStore.savedTasks = upsertSavedTask(inMemoryStore.savedTasks, { ...completedSnapshot }, "closed");
 
-    mockStore.instances = mockStore.instances.map((instance) => {
+    inMemoryStore.instances = inMemoryStore.instances.map((instance) => {
       if (instance.id !== completed.instanceId) return instance;
-      const nextTask = mockStore.tasks.find((task) => task.instanceId === completed.instanceId && task.status !== "completed");
+      const nextTask = inMemoryStore.tasks.find((task) => task.instanceId === completed.instanceId && task.status !== "completed");
       return {
         ...instance,
         currentNode: nextTask?.name ?? "Completed",
@@ -163,14 +163,14 @@ export async function completeTask(
     });
 
     const taskStatusByNodeId = new Map(
-      mockStore.tasks
+      inMemoryStore.tasks
         .filter((item) => item.instanceId === completed.instanceId && item.nodeId)
         .map((item) => [item.nodeId as string, item.status])
     );
-    const runtime = applyRuntimeStateForInstance(mockStore.designerGraph, completed.instanceId, taskStatusByNodeId);
-    mockStore.designerGraph = runtime.graph;
+    const runtime = applyRuntimeStateForInstance(inMemoryStore.designerGraph, completed.instanceId, taskStatusByNodeId);
+    inMemoryStore.designerGraph = runtime.graph;
     const preferredCurrentNode = getPreferredCurrentNodeForInstance(completed.instanceId);
-    mockStore.instances = mockStore.instances.map((instance) =>
+    inMemoryStore.instances = inMemoryStore.instances.map((instance) =>
       instance.id === completed.instanceId
         ? {
           ...instance,
@@ -195,18 +195,18 @@ export async function completeTask(
       payload: { source: "token_traversal" },
     }));
     if (runtimeAuditEvents.length > 0) {
-      mockStore.audit = [...runtimeAuditEvents, ...mockStore.audit];
+      inMemoryStore.audit = [...runtimeAuditEvents, ...inMemoryStore.audit];
     }
   }
 
   return {
-    tasks: deepClone(mockStore.tasks),
-    savedTasks: deepClone(mockStore.savedTasks),
-    audit: deepClone(mockStore.audit),
+    tasks: deepClone(inMemoryStore.tasks),
+    savedTasks: deepClone(inMemoryStore.savedTasks),
+    audit: deepClone(inMemoryStore.audit),
     graph: completed
-      ? projectDesignerGraphByInstance(mockStore.designerGraph, completed.instanceId)
-      : deepClone(mockStore.designerGraph),
-    instances: deepClone(mockStore.instances),
+      ? projectDesignerGraphByInstance(inMemoryStore.designerGraph, completed.instanceId)
+      : deepClone(inMemoryStore.designerGraph),
+    instances: deepClone(inMemoryStore.instances),
   };
 }
 
@@ -224,18 +224,18 @@ export async function saveTaskEdits(
   await ensureInitialized();
   await sleep();
 
-  const taskIndex = mockStore.tasks.findIndex((task) => task.id === taskId);
+  const taskIndex = inMemoryStore.tasks.findIndex((task) => task.id === taskId);
   if (taskIndex < 0) {
     return {
-      tasks: deepClone(mockStore.tasks),
-      savedTasks: deepClone(mockStore.savedTasks),
-      graph: deepClone(mockStore.designerGraph),
-      instances: deepClone(mockStore.instances),
-      audit: deepClone(mockStore.audit),
+      tasks: deepClone(inMemoryStore.tasks),
+      savedTasks: deepClone(inMemoryStore.savedTasks),
+      graph: deepClone(inMemoryStore.designerGraph),
+      instances: deepClone(inMemoryStore.instances),
+      audit: deepClone(inMemoryStore.audit),
     };
   }
 
-  const current = mockStore.tasks[taskIndex];
+  const current = inMemoryStore.tasks[taskIndex];
   const nextTriageColor = updates.triageColor ?? current.triageColor ?? "yellow";
   const nowIso = new Date().toISOString();
   const normalizedPatientName = updates.patientName?.trim();
@@ -261,16 +261,16 @@ export async function saveTaskEdits(
     updatedAt: nowIso,
   };
 
-  mockStore.tasks = [
-    ...mockStore.tasks.slice(0, taskIndex),
+  inMemoryStore.tasks = [
+    ...inMemoryStore.tasks.slice(0, taskIndex),
     nextTask,
-    ...mockStore.tasks.slice(taskIndex + 1),
+    ...inMemoryStore.tasks.slice(taskIndex + 1),
   ];
 
   if (nextTask.nodeId) {
-    mockStore.designerGraph = {
-      ...mockStore.designerGraph,
-      nodes: mockStore.designerGraph.nodes.map((node) =>
+    inMemoryStore.designerGraph = {
+      ...inMemoryStore.designerGraph,
+      nodes: inMemoryStore.designerGraph.nodes.map((node) =>
         node.id === nextTask.nodeId
           ? {
               ...node,
@@ -285,7 +285,7 @@ export async function saveTaskEdits(
     };
   }
 
-  mockStore.instances = mockStore.instances.map((instance) =>
+  inMemoryStore.instances = inMemoryStore.instances.map((instance) =>
     instance.id === nextTask.instanceId
       ? {
           ...instance,
@@ -296,18 +296,18 @@ export async function saveTaskEdits(
       : instance
   );
 
-  mockStore.savedTasks = upsertSavedTask(
-    mockStore.savedTasks,
+  inMemoryStore.savedTasks = upsertSavedTask(
+    inMemoryStore.savedTasks,
     nextTask,
     nextTask.status === "completed" ? "closed" : "open"
   );
 
   return {
-    tasks: deepClone(mockStore.tasks),
-    savedTasks: deepClone(mockStore.savedTasks),
-    graph: projectDesignerGraphByInstance(mockStore.designerGraph, nextTask.instanceId),
-    instances: deepClone(mockStore.instances),
-    audit: deepClone(mockStore.audit),
+    tasks: deepClone(inMemoryStore.tasks),
+    savedTasks: deepClone(inMemoryStore.savedTasks),
+    graph: projectDesignerGraphByInstance(inMemoryStore.designerGraph, nextTask.instanceId),
+    instances: deepClone(inMemoryStore.instances),
+    audit: deepClone(inMemoryStore.audit),
   };
 }
 
@@ -315,12 +315,12 @@ export async function deleteTask(taskId: string): Promise<TaskApiResponse> {
   await ensureInitialized();
   await sleep();
 
-  const task = mockStore.tasks.find((item) => item.id === taskId);
+  const task = inMemoryStore.tasks.find((item) => item.id === taskId);
   if (!task) {
     throw new Error("task not found");
   }
 
-  const savedTask = mockStore.savedTasks.find((record) => {
+  const savedTask = inMemoryStore.savedTasks.find((record) => {
     const id = typeof record.id === "string" ? record.id : "";
     return id === taskId;
   });
@@ -328,24 +328,24 @@ export async function deleteTask(taskId: string): Promise<TaskApiResponse> {
     typeof savedTask?.processStatus === "string"
       ? savedTask.processStatus.toLowerCase()
       : "open";
-  const instance = mockStore.instances.find((item) => item.id === task.instanceId);
+  const instance = inMemoryStore.instances.find((item) => item.id === task.instanceId);
   const instanceStatus = (instance?.status ?? "").toLowerCase();
 
   if (processStatus !== "closed" || instanceStatus !== "completed") {
     throw new Error("task can be deleted only after END is reached and process is closed");
   }
 
-  mockStore.tasks = mockStore.tasks.filter((item) => item.id !== taskId);
-  mockStore.savedTasks = mockStore.savedTasks.filter((record) => {
+  inMemoryStore.tasks = inMemoryStore.tasks.filter((item) => item.id !== taskId);
+  inMemoryStore.savedTasks = inMemoryStore.savedTasks.filter((record) => {
     const id = typeof record.id === "string" ? record.id : "";
     return id !== taskId;
   });
 
   return {
-    tasks: deepClone(mockStore.tasks),
-    savedTasks: deepClone(mockStore.savedTasks),
-    graph: deepClone(mockStore.designerGraph),
-    instances: deepClone(mockStore.instances),
-    audit: deepClone(mockStore.audit),
+    tasks: deepClone(inMemoryStore.tasks),
+    savedTasks: deepClone(inMemoryStore.savedTasks),
+    graph: deepClone(inMemoryStore.designerGraph),
+    instances: deepClone(inMemoryStore.instances),
+    audit: deepClone(inMemoryStore.audit),
   };
 }

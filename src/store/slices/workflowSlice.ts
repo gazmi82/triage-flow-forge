@@ -27,7 +27,7 @@ import {
   type SavedTaskRecord,
   type Task,
   type User,
-} from "@/data/mockData";
+} from "@/data/contracts";
 
 interface WorkflowState {
   users: User[];
@@ -85,7 +85,7 @@ type CreateUserPayload = AdminCreateUserResponse;
 
 export const bootstrapWorkflowThunk = createAsyncThunk<BootstrapPayload>("workflow/bootstrap", async () => {
   return await appQueryClient.fetchQuery({
-    queryKey: ["mock-data", "workflow-bootstrap"],
+    queryKey: ["workflow-data", "workflow-bootstrap"],
     queryFn: () => appApi.fetchBootstrapData(),
     staleTime: 5 * 60 * 1000,
   });
