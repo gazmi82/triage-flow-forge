@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { type Role } from "@/data/contracts";
+import { type AdminLogEntry, type AdminLogSummary, type LogLevel, type Role } from "@/data/contracts";
 import { RoleBadge, StatusBadge } from "@/components/ui/Badges";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Toggle } from "@/components/ui/toggle";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,11 +16,82 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { GitBranch, Users, CheckCircle2, XCircle, Plus } from "lucide-react";
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart";
+import { GitBranch, Users, CheckCircle2, XCircle, Plus, ChartNoAxesCombined, RefreshCcw } from "lucide-react";
 import { useAppDispatch, useAppSelector } from "@/store/hooks";
 import { bootstrapWorkflowThunk, createUserThunk } from "@/store/slices/workflowSlice";
 import { ROLE_LABELS } from "@/data/constants";
 import { useToast } from "@/hooks";
+import { appApi } from "@/data/appApi";
+import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, XAxis } from "recharts";
+
+const EMPTY_LOG_SUMMARY: AdminLogSummary = {
+  total: 0,
+  incidents: 0,
+  byLevel: {},
+  byChannel: {},
+  timeline: [],
+};
+
+const LOG_LEVEL_ORDER: LogLevel[] = ["debug", "info", "warn", "error"];
+const LOG_LEVEL_COLORS: Record<LogLevel, string> = {
+  debug: "#64748b",
+  info: "#2563eb",
+  warn: "#d97706",
+  error: "#dc2626",
+};
+
+const levelBadgeClass: Record<LogLevel, string> = {
+  debug: "border-slate-300 text-slate-600",
+  info: "border-blue-300 text-blue-700",
+  warn: "border-amber-300 text-amber-700",
+  error: "border-red-300 text-red-700",
+};
+
+type AdminLogFilterState = {
+  level: "all" | LogLevel;
+  channel: string;
+  search: string;
+  sinceMinutes: string;
+  limit: string;
+};
+
+const initialLogFilterState: AdminLogFilterState = {
+  level: "all",
+  channel: "all",
+  search: "",
+  sinceMinutes: "180",
+  limit: "200",
+};
+
+const LOG_ROWS_PER_PAGE_OPTIONS = [20, 50, 100] as const;
+
+const enrichLogFieldsWithCreationParts = (entry: AdminLogEntry): Record<string, unknown> => {
+  return {
+    createdAt: entry.timestamp,
+    ...(entry.fields ?? {}),
+  };
+};
+
+const formatLogFields = (entry: AdminLogEntry): string => {
+  return JSON.stringify(enrichLogFieldsWithCreationParts(entry), null, 2);
+};
+
+const formatLogFieldsRaw = (entry: AdminLogEntry): string => {
+  return JSON.stringify(enrichLogFieldsWithCreationParts(entry));
+};
+
+const toLogApiFilter = (filter: AdminLogFilterState) => {
+  const sinceMinutes = Number(filter.sinceMinutes);
+  const limit = Number(filter.limit);
+  return {
+    level: filter.level,
+    channel: filter.channel,
+    search: filter.search.trim(),
+    sinceMinutes: Number.isFinite(sinceMinutes) && sinceMinutes > 0 ? sinceMinutes : 180,
+    limit: Number.isFinite(limit) && limit > 0 ? limit : 200,
+  };
+};
 
 export default function Admin() {
   const dispatch = useAppDispatch();
@@ -35,6 +107,16 @@ export default function Admin() {
   });
   const [createUserError, setCreateUserError] = useState<string | null>(null);
   const [isSubmittingCreateUser, setIsSubmittingCreateUser] = useState(false);
+  const [logEntries, setLogEntries] = useState<AdminLogEntry[]>([]);
+  const [logSummary, setLogSummary] = useState<AdminLogSummary>(EMPTY_LOG_SUMMARY);
+  const [isLoadingLogs, setIsLoadingLogs] = useState(false);
+  const [logError, setLogError] = useState<string | null>(null);
+  const [logFilters, setLogFilters] = useState<AdminLogFilterState>(initialLogFilterState);
+  const [appliedLogFilters, setAppliedLogFilters] = useState<AdminLogFilterState>(initialLogFilterState);
+  const [logRefreshTick, setLogRefreshTick] = useState(0);
+  const [logRowsPerPage, setLogRowsPerPage] = useState<number>(20);
+  const [logCurrentPage, setLogCurrentPage] = useState<number>(1);
+  const [logFieldViewMode, setLogFieldViewMode] = useState<Record<string, "raw" | "json">>({});
   const users = useAppSelector((state) => state.workflow.users);
   const definitions = useAppSelector((state) => state.workflow.definitions);
   const instances = useAppSelector((state) => state.workflow.instances);
@@ -47,6 +129,44 @@ export default function Admin() {
       dispatch(bootstrapWorkflowThunk());
     }
   }, [dispatch, hasBootstrapped, isLoading]);
+
+  useEffect(() => {
+    if (activeTab !== "logs") {
+      return;
+    }
+
+    let cancelled = false;
+    const loadLogs = async () => {
+      setIsLoadingLogs(true);
+      setLogError(null);
+      try {
+        const query = toLogApiFilter(appliedLogFilters);
+        const [entriesPayload, summaryPayload] = await Promise.all([
+          appApi.fetchAdminLogs(query),
+          appApi.fetchAdminLogSummary(query),
+        ]);
+        if (cancelled) {
+          return;
+        }
+        setLogEntries(entriesPayload.entries);
+        setLogSummary(summaryPayload);
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+        setLogError(error instanceof Error ? error.message : "Unable to load logs.");
+      } finally {
+        if (!cancelled) {
+          setIsLoadingLogs(false);
+        }
+      }
+    };
+
+    void loadLogs();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, appliedLogFilters, logRefreshTick]);
 
   const roles: Role[] = useMemo(
     () => ["reception", "triage_nurse", "physician", "lab", "radiology", "admin"],
@@ -82,6 +202,64 @@ export default function Admin() {
       };
     });
   }, [instances, roles, tasks, users]);
+
+  const availableChannels = useMemo(() => {
+    const channels = new Set<string>(["all"]);
+    Object.keys(logSummary.byChannel).forEach((channel) => channels.add(channel));
+    return Array.from(channels);
+  }, [logSummary.byChannel]);
+
+  const levelChartData = useMemo(
+    () =>
+      LOG_LEVEL_ORDER.map((level) => ({
+        level,
+        count: logSummary.byLevel[level] ?? 0,
+      })),
+    [logSummary.byLevel]
+  );
+
+  const channelChartData = useMemo(
+    () =>
+      Object.entries(logSummary.byChannel)
+        .map(([channel, count]) => ({ channel, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 8),
+    [logSummary.byChannel]
+  );
+
+  const timelineChartData = useMemo(
+    () =>
+      logSummary.timeline.map((point) => ({
+        bucket: new Date(`${point.bucket}:00Z`).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        count: point.count,
+      })),
+    [logSummary.timeline]
+  );
+
+  const logTotalPages = useMemo(
+    () => Math.max(1, Math.ceil(logEntries.length / logRowsPerPage)),
+    [logEntries.length, logRowsPerPage]
+  );
+
+  const pagedLogEntries = useMemo(() => {
+    const start = (logCurrentPage - 1) * logRowsPerPage;
+    return logEntries.slice(start, start + logRowsPerPage);
+  }, [logCurrentPage, logEntries, logRowsPerPage]);
+
+  const pagedLogRange = useMemo(() => {
+    if (logEntries.length === 0) {
+      return { from: 0, to: 0 };
+    }
+    const from = (logCurrentPage - 1) * logRowsPerPage + 1;
+    const to = Math.min(logCurrentPage * logRowsPerPage, logEntries.length);
+    return { from, to };
+  }, [logCurrentPage, logEntries.length, logRowsPerPage]);
+
+  useEffect(() => {
+    if (logCurrentPage > logTotalPages) {
+      setLogCurrentPage(logTotalPages);
+    }
+  }, [logCurrentPage, logTotalPages]);
 
   const resetCreateUserForm = () => {
     setCreateUserForm({
@@ -129,6 +307,18 @@ export default function Admin() {
     resetCreateUserForm();
   };
 
+  const applyLogFilters = () => {
+    setAppliedLogFilters(logFilters);
+    setLogCurrentPage(1);
+  };
+
+  const refreshLogs = () => {
+    setLogRefreshTick((prev) => prev + 1);
+  };
+
+  const getLogEntryKey = (entry: AdminLogEntry, index: number): string =>
+    `${entry.timestamp}|${entry.channel}|${entry.message}|${entry.requestId ?? ""}|${entry.traceId ?? ""}|${index}`;
+
   return (
     <div className="h-full overflow-y-auto p-6 space-y-6">
       <div>
@@ -145,6 +335,10 @@ export default function Admin() {
           <TabsTrigger value="users" className="gap-1.5 text-xs">
             <Users className="h-3.5 w-3.5" />
             Users & Roles
+          </TabsTrigger>
+          <TabsTrigger value="logs" className="gap-1.5 text-xs">
+            <ChartNoAxesCombined className="h-3.5 w-3.5" />
+            Logs & Incidents
           </TabsTrigger>
         </TabsList>
 
@@ -320,6 +514,289 @@ export default function Admin() {
                   )}
                 </tbody>
               </table>
+            </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="logs" className="mt-4 space-y-4">
+          <div className="rounded-lg border border-border bg-card p-4">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
+              <div className="space-y-1">
+                <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Level</Label>
+                <Select
+                  value={logFilters.level}
+                  onValueChange={(value: "all" | LogLevel) => setLogFilters((prev) => ({ ...prev, level: value }))}
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="All levels" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All levels</SelectItem>
+                    {LOG_LEVEL_ORDER.map((level) => (
+                      <SelectItem key={level} value={level}>
+                        {level.toUpperCase()}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Channel</Label>
+                <Select
+                  value={logFilters.channel}
+                  onValueChange={(value: string) => setLogFilters((prev) => ({ ...prev, channel: value }))}
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="All channels" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableChannels.map((channel) => (
+                      <SelectItem key={channel} value={channel}>
+                        {channel}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Search</Label>
+                <Input
+                  className="h-8 text-xs"
+                  value={logFilters.search}
+                  onChange={(event) => setLogFilters((prev) => ({ ...prev, search: event.target.value }))}
+                  placeholder="message / requestId / traceId"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Window (minutes)</Label>
+                <Input
+                  className="h-8 text-xs"
+                  type="number"
+                  min={5}
+                  max={1440}
+                  value={logFilters.sinceMinutes}
+                  onChange={(event) => setLogFilters((prev) => ({ ...prev, sinceMinutes: event.target.value }))}
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Limit</Label>
+                <Input
+                  className="h-8 text-xs"
+                  type="number"
+                  min={50}
+                  max={2000}
+                  value={logFilters.limit}
+                  onChange={(event) => setLogFilters((prev) => ({ ...prev, limit: event.target.value }))}
+                />
+              </div>
+
+              <div className="flex items-end gap-2">
+                <Button size="sm" className="h-8 text-xs" onClick={applyLogFilters}>
+                  Apply
+                </Button>
+                <Button size="sm" variant="outline" className="h-8 text-xs gap-1.5" onClick={refreshLogs}>
+                  <RefreshCcw className="h-3.5 w-3.5" />
+                  Refresh
+                </Button>
+              </div>
+            </div>
+            {logError && <p className="mt-2 text-xs text-destructive">{logError}</p>}
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="rounded-lg border border-border bg-card p-4">
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Total Events</p>
+              <p className="mt-2 text-2xl font-semibold">{logSummary.total}</p>
+            </div>
+            <div className="rounded-lg border border-border bg-card p-4">
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Incidents</p>
+              <p className="mt-2 text-2xl font-semibold text-red-600">{logSummary.incidents}</p>
+            </div>
+            <div className="rounded-lg border border-border bg-card p-4">
+              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Visible Rows</p>
+              <p className="mt-2 text-2xl font-semibold">{logEntries.length}</p>
+            </div>
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-3">
+            <div className="rounded-lg border border-border bg-card p-4">
+              <p className="text-sm font-semibold mb-3">Events by Level</p>
+              <ChartContainer
+                config={Object.fromEntries(LOG_LEVEL_ORDER.map((level) => [level, { label: level, color: LOG_LEVEL_COLORS[level] }]))}
+                className="h-[220px] w-full"
+              >
+                <BarChart data={levelChartData}>
+                  <CartesianGrid vertical={false} />
+                  <XAxis dataKey="level" tickLine={false} axisLine={false} />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Bar dataKey="count" radius={4}>
+                    {levelChartData.map((item) => (
+                      <Cell key={item.level} fill={LOG_LEVEL_COLORS[item.level]} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ChartContainer>
+            </div>
+
+            <div className="rounded-lg border border-border bg-card p-4">
+              <p className="text-sm font-semibold mb-3">Events by Channel</p>
+              <ChartContainer config={{ count: { label: "count", color: "#2563eb" } }} className="h-[220px] w-full">
+                <PieChart>
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Pie data={channelChartData} dataKey="count" nameKey="channel" outerRadius={78}>
+                    {channelChartData.map((item, index) => (
+                      <Cell key={item.channel} fill={["#2563eb", "#16a34a", "#ea580c", "#9333ea", "#0f766e", "#be123c", "#4f46e5", "#0891b2"][index % 8]} />
+                    ))}
+                  </Pie>
+                </PieChart>
+              </ChartContainer>
+            </div>
+
+            <div className="rounded-lg border border-border bg-card p-4">
+              <p className="text-sm font-semibold mb-3">Event Timeline</p>
+              <ChartContainer config={{ count: { label: "count", color: "#0f766e" } }} className="h-[220px] w-full">
+                <LineChart data={timelineChartData}>
+                  <CartesianGrid vertical={false} />
+                  <XAxis dataKey="bucket" tickLine={false} axisLine={false} minTickGap={24} />
+                  <ChartTooltip content={<ChartTooltipContent />} />
+                  <Line type="monotone" dataKey="count" stroke="#0f766e" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ChartContainer>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-border bg-card overflow-hidden">
+            <div className="border-b border-border px-4 py-3 flex items-center justify-between">
+              <p className="text-sm font-semibold">Log Stream</p>
+              {isLoadingLogs && <p className="text-xs text-muted-foreground">Loading…</p>}
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead className="bg-muted/50">
+                  <tr className="border-b border-border">
+                    <th className="text-left px-4 py-2.5 font-semibold text-muted-foreground">Timestamp</th>
+                    <th className="text-left px-4 py-2.5 font-semibold text-muted-foreground">Level</th>
+                    <th className="text-left px-4 py-2.5 font-semibold text-muted-foreground">Channel</th>
+                    <th className="text-left px-4 py-2.5 font-semibold text-muted-foreground">Message</th>
+                    <th className="text-left px-4 py-2.5 font-semibold text-muted-foreground">Request ID</th>
+                    <th className="text-left px-4 py-2.5 font-semibold text-muted-foreground">Trace ID</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {pagedLogEntries.map((entry, index) => {
+                    const absoluteIndex = (logCurrentPage - 1) * logRowsPerPage + index;
+                    const entryKey = getLogEntryKey(entry, absoluteIndex);
+                    const viewMode = logFieldViewMode[entryKey] ?? "raw";
+                    return (
+                    <tr key={entryKey} className="hover:bg-muted/30 transition-colors">
+                      <td className="px-4 py-2.5 text-muted-foreground whitespace-nowrap">
+                        {new Date(entry.timestamp).toLocaleString()}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <Badge variant="outline" className={`uppercase text-[10px] ${levelBadgeClass[entry.level]}`}>
+                          {entry.level}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-2.5 font-medium">{entry.channel}</td>
+                      <td className="px-4 py-2.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <p>{entry.message}</p>
+                          {entry.fields && Object.keys(entry.fields).length > 0 && (
+                            <div className="flex items-center gap-1">
+                              <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Raw</span>
+                              <Toggle
+                                pressed={viewMode === "json"}
+                                onPressedChange={(pressed) =>
+                                  setLogFieldViewMode((prev) => ({
+                                    ...prev,
+                                    [entryKey]: pressed ? "json" : "raw",
+                                  }))
+                                }
+                                variant="outline"
+                                size="sm"
+                                className="h-6 px-2 text-[10px]"
+                                aria-label="Toggle log formatter"
+                              >
+                                JSON
+                              </Toggle>
+                            </div>
+                          )}
+                        </div>
+                        {entry.fields && Object.keys(entry.fields).length > 0 && (
+                          <pre className="mt-1 whitespace-pre-wrap break-words font-mono text-[10px] text-muted-foreground">
+                            {viewMode === "json" ? formatLogFields(entry) : formatLogFieldsRaw(entry)}
+                          </pre>
+                        )}
+                      </td>
+                      <td className="px-4 py-2.5 font-mono text-[10px] text-muted-foreground">{entry.requestId ?? "-"}</td>
+                      <td className="px-4 py-2.5 font-mono text-[10px] text-muted-foreground">{entry.traceId ?? "-"}</td>
+                    </tr>
+                  )})}
+                  {!isLoadingLogs && logEntries.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">
+                        No log entries found for this filter set.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <div className="border-t border-border px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-muted-foreground">Rows per page</p>
+                <Select
+                  value={String(logRowsPerPage)}
+                  onValueChange={(value: string) => {
+                    setLogRowsPerPage(Number(value));
+                    setLogCurrentPage(1);
+                  }}
+                >
+                  <SelectTrigger className="h-8 w-20 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {LOG_ROWS_PER_PAGE_OPTIONS.map((value) => (
+                      <SelectItem key={value} value={String(value)}>
+                        {value}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <p className="text-xs text-muted-foreground">
+                  {pagedLogRange.from}-{pagedLogRange.to} of {logEntries.length}
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 text-xs"
+                    onClick={() => setLogCurrentPage((prev) => Math.max(1, prev - 1))}
+                    disabled={logCurrentPage <= 1}
+                  >
+                    Prev
+                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    Page {logCurrentPage} / {logTotalPages}
+                  </p>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-8 text-xs"
+                    onClick={() => setLogCurrentPage((prev) => Math.min(logTotalPages, prev + 1))}
+                    disabled={logCurrentPage >= logTotalPages}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
             </div>
           </div>
         </TabsContent>

@@ -26,3 +26,9 @@ cypress/videos
 *.njsproj
 *.sln
 *.sw?
+
+# Docs policy: ignore markdown/readme files except root README.md
+**/*.md
+**/README
+**/README.*
+!README.md

@@ -1,4 +1,6 @@
 import type {
+  AdminLogEntry,
+  AdminLogSummary,
   AdminCreateUserRequest,
   AdminCreateUserResponse,
   AuthPayload,
@@ -196,6 +198,64 @@ export const apiClient = {
     }
 
     return (await response.json()) as AdminCreateUserResponse;
+  },
+
+  async fetchAdminLogs(filters?: {
+    level?: string;
+    channel?: string;
+    search?: string;
+    limit?: number;
+    sinceMinutes?: number;
+  }): Promise<{ entries: AdminLogEntry[] }> {
+    const params = new URLSearchParams();
+    if (filters?.level) params.set("level", filters.level);
+    if (filters?.channel) params.set("channel", filters.channel);
+    if (filters?.search) params.set("search", filters.search);
+    if (typeof filters?.limit === "number") params.set("limit", String(filters.limit));
+    if (typeof filters?.sinceMinutes === "number") params.set("sinceMinutes", String(filters.sinceMinutes));
+
+    const query = params.toString();
+    const response = await fetch(endpoint(`/api/admin/logs${query ? `?${query}` : ""}`), {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        Accept: "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(await parseErrorMessage(response));
+    }
+
+    return (await response.json()) as { entries: AdminLogEntry[] };
+  },
+
+  async fetchAdminLogSummary(filters?: {
+    level?: string;
+    channel?: string;
+    search?: string;
+    sinceMinutes?: number;
+  }): Promise<AdminLogSummary> {
+    const params = new URLSearchParams();
+    if (filters?.level) params.set("level", filters.level);
+    if (filters?.channel) params.set("channel", filters.channel);
+    if (filters?.search) params.set("search", filters.search);
+    if (typeof filters?.sinceMinutes === "number") params.set("sinceMinutes", String(filters.sinceMinutes));
+
+    const query = params.toString();
+    const response = await fetch(endpoint(`/api/admin/logs/summary${query ? `?${query}` : ""}`), {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        Accept: "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(await parseErrorMessage(response));
+    }
+
+    return (await response.json()) as AdminLogSummary;
   },
 
   async fetchTasks(): Promise<Task[]> {

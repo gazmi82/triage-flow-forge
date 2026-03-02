@@ -126,6 +126,31 @@ export interface AdminCreateUserResponse {
   createdUser: User;
 }
 
+export type LogLevel = "debug" | "info" | "warn" | "error";
+
+export interface AdminLogEntry {
+  timestamp: string;
+  level: LogLevel;
+  channel: string;
+  message: string;
+  requestId?: string;
+  traceId?: string;
+  fields?: Record<string, unknown>;
+}
+
+export interface AdminLogSummaryPoint {
+  bucket: string;
+  count: number;
+}
+
+export interface AdminLogSummary {
+  total: number;
+  incidents: number;
+  byLevel: Record<string, number>;
+  byChannel: Record<string, number>;
+  timeline: AdminLogSummaryPoint[];
+}
+
 export interface DesignerGraphPayload {
   nodes: DesignerGraphNode[];
   edges: DesignerGraphEdge[];

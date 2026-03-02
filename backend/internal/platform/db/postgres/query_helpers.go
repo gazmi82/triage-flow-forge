@@ -24,7 +24,7 @@ func (c *Client) queryRowTx(ctx context.Context, tx pgx.Tx, operation, query str
 	return &timedRow{
 		row: row,
 		record: func(err error) {
-			c.recordQueryMetric(operation, query, startedAt, err)
+			c.recordQueryMetric(ctx, operation, query, startedAt, err)
 		},
 	}
 }
@@ -32,6 +32,6 @@ func (c *Client) queryRowTx(ctx context.Context, tx pgx.Tx, operation, query str
 func (c *Client) execTx(ctx context.Context, tx pgx.Tx, operation, query string, args ...any) error {
 	startedAt := time.Now()
 	_, err := tx.Exec(ctx, query, args...)
-	c.recordQueryMetric(operation, query, startedAt, err)
+	c.recordQueryMetric(ctx, operation, query, startedAt, err)
 	return err
 }

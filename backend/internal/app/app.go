@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"log"
 	"net/http"
 	"time"
 
@@ -18,8 +17,10 @@ import (
 	tasksrepo "triage-flow-forge/backend/internal/modules/workflow/tasks/repository/postgres"
 	"triage-flow-forge/backend/internal/platform/cache/redis"
 	"triage-flow-forge/backend/internal/platform/db/postgres"
+	"triage-flow-forge/backend/internal/platform/logging"
 	"triage-flow-forge/backend/internal/platform/metrics"
 	httptransport "triage-flow-forge/backend/internal/transport/http"
+	"triage-flow-forge/backend/internal/transport/http/middleware"
 )
 
 type App struct {
@@ -28,12 +29,15 @@ type App struct {
 	postgres   *postgres.Client
 	redis      *redis.Client
 	metrics    *metrics.Registry
+	logger     *logging.Logger
 }
 
 func New(cfg Config) (*App, error) {
+	appLogger := logging.NewFromEnv()
 	pg := postgres.NewClient(cfg.PostgresDSN)
 	metricRegistry := metrics.New()
 	pg.SetMetrics(metricRegistry)
+	pg.SetLogger(appLogger)
 	rdb := redis.NewClient(cfg.RedisAddr, cfg.RedisPassword, cfg.RedisDB)
 	authService := auth.NewService(authrepo.New(pg))
 	adminService := admin.NewService(adminrepo.New(pg))
@@ -45,12 +49,14 @@ func New(cfg Config) (*App, error) {
 		Readiness: pg,
 		Redis:     rdb,
 		Metrics:   metricRegistry,
+		Logger:    appLogger,
 		Auth:      authService,
 		Admin:     adminService,
 		Bootstrap: bootstrapService,
 		Tasks:     tasksService,
 		Creation:  taskCreationService,
 	})
+	middleware.SetLogger(appLogger)
 
 	return &App{
 		cfg: cfg,
@@ -62,6 +68,7 @@ func New(cfg Config) (*App, error) {
 		postgres: pg,
 		redis:    rdb,
 		metrics:  metricRegistry,
+		logger:   appLogger,
 	}, nil
 }
 
@@ -72,8 +79,17 @@ func (a *App) Run(ctx context.Context) error {
 	if err := a.postgres.Ping(ctx); err != nil {
 		return err
 	}
+	if a.logger != nil {
+		a.logger.Info(ctx, "system", "postgres readiness check passed", nil)
+	}
 	if err := a.redis.Ping(ctx); err != nil {
-		log.Printf("redis unavailable at startup, continuing in degraded mode: %v", err)
+		if a.logger != nil {
+			a.logger.Warn(ctx, "system", "redis unavailable at startup; continuing in degraded mode", map[string]any{
+				"error": err.Error(),
+			})
+		}
+	} else if a.logger != nil {
+		a.logger.Info(ctx, "system", "redis readiness check passed", nil)
 	}
 
 	errCh := make(chan error, 1)

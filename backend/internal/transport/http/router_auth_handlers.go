@@ -23,6 +23,8 @@ type authSessionRecord struct {
 	CreatedAt string                `json:"createdAt"`
 }
 
+var errMissingSession = errors.New("missing session")
+
 const (
 	sessionCookieName = "triage_session"
 	sessionKeyPrefix  = "session:"
@@ -45,10 +47,26 @@ func (s *server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		switch {
 		case errors.Is(err, postgres.ErrInvalidCredentials):
+			if s.deps.Logger != nil {
+				s.deps.Logger.Warn(r.Context(), "security", "login failed: invalid credentials", map[string]any{
+					"email": req.Email,
+				})
+			}
 			writeError(w, http.StatusUnauthorized, "Invalid email or password.")
 		case errors.Is(err, postgres.ErrUserInactive):
+			if s.deps.Logger != nil {
+				s.deps.Logger.Warn(r.Context(), "security", "login failed: inactive user", map[string]any{
+					"email": req.Email,
+				})
+			}
 			writeError(w, http.StatusForbidden, "User not found or inactive.")
 		default:
+			if s.deps.Logger != nil {
+				s.deps.Logger.Error(r.Context(), "security", "login failed: unexpected auth error", map[string]any{
+					"email": req.Email,
+					"error": err.Error(),
+				})
+			}
 			writeError(w, http.StatusInternalServerError, "Unable to sign in.")
 		}
 		return
@@ -70,6 +88,12 @@ func (s *server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := s.deps.Redis.SetString(r.Context(), sessionKey(sessionID), string(raw), sessionTTL); err != nil {
+		if s.deps.Logger != nil {
+			s.deps.Logger.Error(r.Context(), "security", "login failed: session store unavailable", map[string]any{
+				"userId": payload.ID,
+				"error":  err.Error(),
+			})
+		}
 		writeError(w, http.StatusServiceUnavailable, "Session store unavailable.")
 		return
 	}
@@ -83,6 +107,13 @@ func (s *server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   int(sessionTTL.Seconds()),
 	})
+
+	if s.deps.Logger != nil {
+		s.deps.Logger.Info(r.Context(), "security", "login succeeded", map[string]any{
+			"userId": payload.ID,
+			"role":   payload.Role,
+		})
+	}
 
 	writeJSON(w, http.StatusOK, payload)
 }
@@ -101,8 +132,21 @@ func (s *server) handleCreateUser(w http.ResponseWriter, r *http.Request) {
 
 	payload, err := s.deps.Admin.CreateUser(r.Context(), req)
 	if err != nil {
+		if s.deps.Logger != nil {
+			s.deps.Logger.Warn(r.Context(), "audit", "admin create user failed", map[string]any{
+				"email": req.Email,
+				"role":  req.Role,
+				"error": err.Error(),
+			})
+		}
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
+	}
+	if s.deps.Logger != nil {
+		s.deps.Logger.Info(r.Context(), "audit", "admin created user", map[string]any{
+			"userId": payload.CreatedUser.ID,
+			"role":   payload.CreatedUser.Role,
+		})
 	}
 	writeJSON(w, http.StatusOK, payload)
 }
@@ -115,7 +159,11 @@ func (s *server) handleSession(w http.ResponseWriter, r *http.Request) {
 
 	record, err := s.readSession(r)
 	if err != nil {
-		writeError(w, http.StatusUnauthorized, "Not authenticated.")
+		if errors.Is(err, errMissingSession) {
+			writeError(w, http.StatusUnauthorized, "Not authenticated.")
+		} else {
+			writeError(w, http.StatusServiceUnavailable, "Session store unavailable.")
+		}
 		return
 	}
 
@@ -142,19 +190,26 @@ func (s *server) handleLogout(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   -1,
 	})
 
+	if s.deps.Logger != nil {
+		s.deps.Logger.Info(r.Context(), "security", "logout succeeded", map[string]any{
+			"method": r.Method,
+			"path":   r.URL.Path,
+		})
+	}
+
 	writeJSON(w, http.StatusOK, map[string]string{"status": "signed_out"})
 }
 
 func (s *server) readSession(r *http.Request) (authSessionRecord, error) {
 	cookie, err := r.Cookie(sessionCookieName)
 	if err != nil || cookie.Value == "" {
-		return authSessionRecord{}, errors.New("missing session")
+		return authSessionRecord{}, errMissingSession
 	}
 
 	raw, err := s.deps.Redis.GetString(r.Context(), sessionKey(cookie.Value))
 	if err != nil {
 		if errors.Is(err, redis.ErrKeyNotFound) {
-			return authSessionRecord{}, errors.New("missing session")
+			return authSessionRecord{}, errMissingSession
 		}
 		return authSessionRecord{}, err
 	}

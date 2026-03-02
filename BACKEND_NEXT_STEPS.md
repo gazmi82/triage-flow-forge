@@ -1,6 +1,6 @@
 # Backend Next Steps (Execution Tracker)
 
-Last updated: 2026-02-28
+Last updated: 2026-03-02
 
 This file tracks what is already integrated vs what is still required for full backend parity.
 
@@ -11,7 +11,11 @@ This file tracks what is already integrated vs what is still required for full b
 - Backend modular monolith scaffold (app, modules, transport, platform layers).
 - Postgres + Redis wiring and readiness checks.
 - Auth login/session/logout with Redis-backed session cookie.
+- Route-level authz middleware and RBAC gate for admin endpoints.
 - Admin user creation endpoint.
+- Admin runtime logs endpoints:
+  - `GET /api/admin/logs`
+  - `GET /api/admin/logs/summary`
 - Workflow bootstrap endpoint.
 - Task runtime endpoints:
   - fetch tasks
@@ -23,6 +27,14 @@ This file tracks what is already integrated vs what is still required for full b
   - task-scoped designer graph fetch
 - Shared contracts extracted into `internal/modules/contracts`.
 - Postgres refactor to reduce long files and isolate graph-runtime helpers.
+- Structured logging stack:
+  - request/trace correlation IDs (`X-Request-ID`, `X-Trace-ID`)
+  - redaction for sensitive fields (`password`, `token`, `cookie`, `session`, `email`, `patientId`)
+  - DB slow/failing query logs with `queryHash` and lock-aware hints
+  - no-row lookups (`pgx.ErrNoRows`) treated as non-failure debug signal
+- HTTP log level tuning:
+  - 401/403 logged as `info` in `http` channel
+  - security events remain `warn`
 
 ### In Progress / Pending
 
@@ -36,11 +48,10 @@ This file tracks what is already integrated vs what is still required for full b
 3. Error contract hardening
 - Normalize API errors to stable envelope (`code`, `message`, optional `fields`, `traceId`).
 
-4. RBAC middleware
-- Enforce role checks at route/service boundary (not only UI).
-
-5. Metrics expansion
+4. Metrics expansion
 - Add endpoint-level mutation success/failure counters and latency buckets.
+5. Persisted log sink
+- Optional persistent sink (Postgres/ELK/OpenSearch) in addition to in-memory ring buffer.
 
 ## Immediate Priority (because frontend now uses backend-only transport)
 

@@ -69,6 +69,8 @@ Backend notable APIs:
 - `GET /api/auth/session`
 - `POST /api/auth/logout`
 - `POST /api/admin/users`
+- `GET /api/admin/logs`
+- `GET /api/admin/logs/summary`
 - `GET /api/tasks`
 - `POST /api/tasks/create-from-console`
 - `GET /api/tasks/:taskId/designer`
@@ -86,11 +88,27 @@ Backend notable APIs:
 - END/closed semantics gate deletion.
 - Start-to-first-task edge enforcement is part of runtime graph shaping.
 - Frontend transport is backend-only (runtime in-memory fallback removed).
+- Logging/observability:
+  - request + trace correlation IDs
+  - sensitive field redaction
+  - DB slow/failure logging with query hash
+  - admin-facing log table and chart summary
 
 </details>
 
 <details>
-<summary><strong>7) Known Gaps</strong></summary>
+<summary><strong>7) Admin Logs UX</strong></summary>
+
+- Logs tab supports filtering by level, channel, search term, and lookback window.
+- Log stream table has pagination with default 20 rows/page.
+- Each message row contains a formatter toggle:
+  - `Raw` for compact JSON string
+  - `JSON` for pretty-printed object
+
+</details>
+
+<details>
+<summary><strong>8) Known Gaps</strong></summary>
 
 - Backend routes for drafts/publish still need full wiring:
   - `POST /api/workflow/drafts`
@@ -100,7 +118,7 @@ Backend notable APIs:
 </details>
 
 <details>
-<summary><strong>8) Fast Context Recovery</strong></summary>
+<summary><strong>9) Fast Context Recovery</strong></summary>
 
 If chat/session resets, read in this order:
 

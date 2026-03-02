@@ -19,6 +19,14 @@ export const appApi = {
     return apiClient.createUser(payload);
   },
 
+  async fetchAdminLogs(filters?: Parameters<typeof apiClient.fetchAdminLogs>[0]) {
+    return apiClient.fetchAdminLogs(filters);
+  },
+
+  async fetchAdminLogSummary(filters?: Parameters<typeof apiClient.fetchAdminLogSummary>[0]) {
+    return apiClient.fetchAdminLogSummary(filters);
+  },
+
   async fetchTasks() {
     return apiClient.fetchTasks();
   },

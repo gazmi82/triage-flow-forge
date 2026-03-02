@@ -45,6 +45,9 @@ Vite proxies `/api`, `/health`, `/v1` to backend `http://127.0.0.1:8082`.
 - `REDIS_ADDR` (default `127.0.0.1:6379`)
 - `REDIS_PASSWORD` (optional)
 - `REDIS_DB` (default `0`)
+- `LOG_LEVEL` (default `info`; `debug|info|warn|error`)
+- `LOG_BUFFER_SIZE` (default `5000`; in-memory admin logs buffer)
+- `LOG_SLOW_QUERY_MS` (default `300`; slow query threshold)
 
 ### Frontend
 
@@ -58,6 +61,10 @@ Implemented and active:
 - Task APIs: fetch, claim, save edits, complete, delete
 - Task creation from console (`/api/tasks/create-from-console`)
 - Task-scoped designer projection (`/api/tasks/:taskId/designer`)
+- Admin logs/incident APIs (`/api/admin/logs`, `/api/admin/logs/summary`)
+- Admin Logs UI tab with filters, table view, and charts
+- Admin Logs table pagination (20 rows default)
+- Per-row Message formatter switch (`Raw` / `JSON`) in log stream
 - Saved Tasks refactored to feature module with actions menu (`Canvas`, `View`, `Delete`)
 - New route: `/saved-tasks/:taskId/view` (static Patient Medical Record view)
 - Frontend transport now backend-only (runtime in-memory fallback removed)

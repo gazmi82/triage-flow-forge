@@ -19,6 +19,11 @@ func (s *server) handleTasks(w http.ResponseWriter, r *http.Request) {
 
 	tasks, err := s.deps.Tasks.FetchTasks(r.Context())
 	if err != nil {
+		if s.deps.Logger != nil {
+			s.deps.Logger.Error(r.Context(), "workflow", "failed to fetch tasks", map[string]any{
+				"error": err.Error(),
+			})
+		}
 		writeError(w, http.StatusInternalServerError, "unable to fetch tasks")
 		return
 	}
@@ -37,6 +42,12 @@ func (s *server) handleTaskActions(w http.ResponseWriter, r *http.Request) {
 
 		graph, err := s.deps.Tasks.FetchTaskDesignerGraph(r.Context(), taskID)
 		if err != nil {
+			if s.deps.Logger != nil {
+				s.deps.Logger.Warn(r.Context(), "workflow", "failed to fetch task designer graph", map[string]any{
+					"taskId": taskID,
+					"error":  err.Error(),
+				})
+			}
 			writeError(w, http.StatusBadRequest, err.Error())
 			return
 		}
@@ -58,8 +69,21 @@ func (s *server) handleTaskActions(w http.ResponseWriter, r *http.Request) {
 
 		payload, err := s.deps.Tasks.ClaimTask(r.Context(), taskID, req.AssigneeName)
 		if err != nil {
+			if s.deps.Logger != nil {
+				s.deps.Logger.Warn(r.Context(), "workflow", "task claim failed", map[string]any{
+					"taskId":       taskID,
+					"assigneeName": req.AssigneeName,
+					"error":        err.Error(),
+				})
+			}
 			writeError(w, http.StatusBadRequest, err.Error())
 			return
+		}
+		if s.deps.Logger != nil {
+			s.deps.Logger.Info(r.Context(), "audit", "task claimed", map[string]any{
+				"taskId":       taskID,
+				"assigneeName": req.AssigneeName,
+			})
 		}
 		writeJSON(w, http.StatusOK, payload)
 		return
@@ -79,8 +103,21 @@ func (s *server) handleTaskActions(w http.ResponseWriter, r *http.Request) {
 
 		payload, err := s.deps.Tasks.CompleteTask(r.Context(), taskID, req)
 		if err != nil {
+			if s.deps.Logger != nil {
+				s.deps.Logger.Warn(r.Context(), "workflow", "task completion failed", map[string]any{
+					"taskId": taskID,
+					"actor":  req.Actor,
+					"error":  err.Error(),
+				})
+			}
 			writeError(w, http.StatusBadRequest, err.Error())
 			return
+		}
+		if s.deps.Logger != nil {
+			s.deps.Logger.Info(r.Context(), "audit", "task completed", map[string]any{
+				"taskId": taskID,
+				"actor":  req.Actor,
+			})
 		}
 		writeJSON(w, http.StatusOK, payload)
 		return
@@ -94,8 +131,19 @@ func (s *server) handleTaskActions(w http.ResponseWriter, r *http.Request) {
 
 		payload, err := s.deps.Tasks.DeleteTask(r.Context(), taskID)
 		if err != nil {
+			if s.deps.Logger != nil {
+				s.deps.Logger.Warn(r.Context(), "workflow", "task deletion blocked", map[string]any{
+					"taskId": taskID,
+					"error":  err.Error(),
+				})
+			}
 			writeError(w, http.StatusBadRequest, err.Error())
 			return
+		}
+		if s.deps.Logger != nil {
+			s.deps.Logger.Info(r.Context(), "audit", "task deleted", map[string]any{
+				"taskId": taskID,
+			})
 		}
 		writeJSON(w, http.StatusOK, payload)
 		return
@@ -115,8 +163,21 @@ func (s *server) handleTaskActions(w http.ResponseWriter, r *http.Request) {
 
 		payload, err := s.deps.Tasks.SaveTaskEdits(r.Context(), taskID, req)
 		if err != nil {
+			if s.deps.Logger != nil {
+				s.deps.Logger.Warn(r.Context(), "workflow", "task save failed", map[string]any{
+					"taskId": taskID,
+					"actor":  req.Actor,
+					"error":  err.Error(),
+				})
+			}
 			writeError(w, http.StatusBadRequest, err.Error())
 			return
+		}
+		if s.deps.Logger != nil {
+			s.deps.Logger.Info(r.Context(), "audit", "task saved", map[string]any{
+				"taskId": taskID,
+				"actor":  req.Actor,
+			})
 		}
 		writeJSON(w, http.StatusOK, payload)
 		return
@@ -141,8 +202,21 @@ func (s *server) handleCreateTaskFromConsole(w http.ResponseWriter, r *http.Requ
 
 	payload, err := s.deps.Creation.CreateTaskFromConsole(r.Context(), req)
 	if err != nil {
+		if s.deps.Logger != nil {
+			s.deps.Logger.Warn(r.Context(), "workflow", "task creation from console failed", map[string]any{
+				"instanceId": req.InstanceID,
+				"nodeType":   req.NodeType,
+				"error":      err.Error(),
+			})
+		}
 		writeError(w, http.StatusBadRequest, err.Error())
 		return
+	}
+	if s.deps.Logger != nil {
+		s.deps.Logger.Info(r.Context(), "audit", "task created from console", map[string]any{
+			"instanceId": payload.InstanceID,
+			"nodeId":     payload.CreatedNodeID,
+		})
 	}
 	writeJSON(w, http.StatusOK, payload)
 }

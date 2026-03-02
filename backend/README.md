@@ -40,6 +40,9 @@ Loaded from env (`.env` or `backend/.env`) with defaults:
 - `REDIS_ADDR=127.0.0.1:6379`
 - `REDIS_PASSWORD=`
 - `REDIS_DB=0`
+- `LOG_LEVEL=info` (`debug|info|warn|error`)
+- `LOG_BUFFER_SIZE=5000` (in-memory admin log buffer)
+- `LOG_SLOW_QUERY_MS=300` (DB slow query threshold)
 
 ## Implemented Endpoints
 
@@ -53,6 +56,8 @@ Loaded from env (`.env` or `backend/.env`) with defaults:
 - `GET /api/auth/session`
 - `POST /api/auth/logout`
 - `POST /api/admin/users`
+- `GET /api/admin/logs`
+- `GET /api/admin/logs/summary`
 
 ### Workflow/Tasks
 - `GET /api/workflow/bootstrap`
@@ -70,6 +75,18 @@ Loaded from env (`.env` or `backend/.env`) with defaults:
 - Redis: session objects under `session:<id>` with TTL.
 - Login issues `triage_session` HTTP-only cookie.
 - Frontend bootstrap now reads backend bootstrap payload directly (no static public JSON seed file).
+
+## Logging / Observability
+
+- Structured JSON logs with `level`, `channel`, `requestId`, and `traceId`.
+- Redaction for sensitive keys (`password`, `token`, `cookie`, `session`, `email`, `patientId`).
+- Request/trace correlation headers:
+  - `X-Request-ID`
+  - `X-Trace-ID`
+- Security/audit events for auth failures, forbidden access, and task/admin mutations.
+- DB query logging for slow/failing statements with `queryHash`, `durationMs`, and lock-aware hints.
+- `pgx.ErrNoRows` paths are treated as non-failure debug events (not incidents/error counters).
+- Admin log APIs expose filtered log rows and summarized incident/chart data.
 
 ## Mutation Contract
 
