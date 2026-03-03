@@ -23,6 +23,21 @@ import {
   Textarea,
 } from "@/components/ui";
 
+const SYSTEM_ONLY_FIELD_IDS = new Set([
+  "redirect_role",
+  "branch_a_role",
+  "branch_b_role",
+  "xor_active_condition",
+  "correlation_key",
+]);
+
+const toFieldLabel = (fieldId: string): string =>
+  fieldId
+    .split("_")
+    .filter((part) => part.length > 0)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+
 interface TaskFormProps {
   task: Task;
   selectedNodeType: TaskNodeType;
@@ -56,6 +71,7 @@ export function TaskForm({ task, selectedNodeType, onComplete, onSave }: TaskFor
           { id: "patient_id", label: "Patient ID", type: "text", required: true },
           { id: "notes", label: "Notes", type: "textarea", required: false },
         ];
+  const visibleFormFields = effectiveFormFields.filter((field) => field.id !== "urgency");
 
   const [values, setValues] = useState<Record<string, string | boolean>>(task.formValues ?? {});
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -124,7 +140,7 @@ export function TaskForm({ task, selectedNodeType, onComplete, onSave }: TaskFor
   };
 
   const validate = () => {
-    const nextErrors = buildRequiredFieldErrors(effectiveFormFields, values);
+    const nextErrors = buildRequiredFieldErrors(visibleFormFields, values);
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };
@@ -144,6 +160,19 @@ export function TaskForm({ task, selectedNodeType, onComplete, onSave }: TaskFor
   const effectiveBranchBRole = branchBRole || branchBRoleFromValues;
   const effectiveXorCondition = xorSelectedCondition || xorConditionFromValues;
   const effectiveCorrelationKey = correlationKey || correlationKeyFromValues;
+  const knownFieldIds = new Set(visibleFormFields.map((field) => field.id));
+  const handoffContext = Object.entries(values)
+    .filter(([fieldId, value]) => {
+      if (knownFieldIds.has(fieldId)) return false;
+      if (SYSTEM_ONLY_FIELD_IDS.has(fieldId)) return false;
+      if (typeof value === "string") return value.trim().length > 0;
+      return typeof value === "boolean";
+    })
+    .map(([fieldId, value]) => ({
+      id: fieldId,
+      label: toFieldLabel(fieldId),
+      textValue: typeof value === "boolean" ? (value ? "Yes" : "No") : value,
+    }));
 
   const inferTriageColorFromForm = (): TriageColor | undefined => {
     const candidates = [
@@ -169,8 +198,8 @@ export function TaskForm({ task, selectedNodeType, onComplete, onSave }: TaskFor
   const buildSavePayload = () => ({
     formValues: values,
     triageColor: inferTriageColorFromForm(),
-    patientName: findFirstStringFieldValue(effectiveFormFields, values, ["patient_name", "patientName"], ["patient name"]),
-    patientId: findFirstStringFieldValue(effectiveFormFields, values, ["patient_id", "patientId"], ["patient id"]),
+    patientName: findFirstStringFieldValue(visibleFormFields, values, ["patient_name", "patientName"], ["patient name"]),
+    patientId: findFirstStringFieldValue(visibleFormFields, values, ["patient_id", "patientId"], ["patient id"]),
   });
 
   const handleSave = async () => {
@@ -281,7 +310,7 @@ export function TaskForm({ task, selectedNodeType, onComplete, onSave }: TaskFor
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      {effectiveFormFields.map((field) => (
+      {visibleFormFields.map((field) => (
         <div key={field.id} className="space-y-1.5">
           <Label className="text-xs font-medium">
             {field.label}
@@ -351,6 +380,29 @@ export function TaskForm({ task, selectedNodeType, onComplete, onSave }: TaskFor
           {errors[field.id] && <p className="text-[11px] text-destructive">{errors[field.id]}</p>}
         </div>
       ))}
+
+      {handoffContext.length > 0 && (
+        <div className="space-y-2 rounded-md border border-border bg-card p-2.5">
+          <div>
+            <p className="text-xs font-semibold">Handoff Context</p>
+            <p className="text-[11px] text-muted-foreground">
+              Previous role diagnosis/treatment details carried forward with this task.
+            </p>
+          </div>
+          <div className="space-y-1.5">
+            {handoffContext.map((entry) => (
+              <div key={entry.id} className="space-y-1">
+                <Label className="text-xs font-medium">{entry.label}</Label>
+                {entry.textValue.length > 64 ? (
+                  <Textarea className="min-h-[68px] text-sm" value={entry.textValue} readOnly disabled />
+                ) : (
+                  <Input className="h-8 text-sm" value={entry.textValue} readOnly disabled />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <GatewayConfigService
         selectedNodeType={selectedNodeType}

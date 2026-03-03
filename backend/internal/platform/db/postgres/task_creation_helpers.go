@@ -113,12 +113,13 @@ SET
   minutes_remaining = $7,
   patient_name = $8,
   patient_id = $9,
-  form_values = $10,
+  form_fields = $10,
+  form_values = $11,
   updated_at = NOW(),
-  triage_category = $11,
-  triage_color = $12
+  triage_category = $12,
+  triage_color = $13
 WHERE id = $1
-`, taskID, req.Label, assigneeName, string(req.AssignedRole), priority, now.Add(time.Duration(slaMinutes)*time.Minute), slaMinutes, patientName, patientID, formValuesRaw, triageCategory, triageColor)
+`, taskID, req.Label, assigneeName, string(req.AssignedRole), priority, now.Add(time.Duration(slaMinutes)*time.Minute), slaMinutes, patientName, patientID, formFieldsRaw, formValuesRaw, triageCategory, triageColor)
 	}
 	if err != nil {
 		return err

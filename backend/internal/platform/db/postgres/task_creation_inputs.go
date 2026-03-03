@@ -85,21 +85,55 @@ func triageMeta(color string) (priority string, category string, slaMinutes int)
 }
 
 func defaultTaskFormFields(role Role) json.RawMessage {
-	fields := []map[string]any{
+	triageOptions := []string{"Immediate", "Very urgent", "Urgent", "Standard", "Non-urgent"}
+	base := []map[string]any{
 		{"id": "patient_name", "label": "Patient Name", "type": "text", "required": true},
 		{"id": "patient_id", "label": "Patient ID", "type": "text", "required": true},
-		{"id": "notes", "label": "Notes", "type": "textarea", "required": false},
 	}
 
-	if role == "triage_nurse" {
-		fields = append(fields, map[string]any{
-			"id":       "urgency",
-			"label":    "Urgency",
-			"type":     "select",
-			"required": false,
-			"options":  []string{"Immediate", "Very urgent", "Urgent", "Standard", "Non-urgent"},
-		})
+	fields := append([]map[string]any{}, base...)
+
+	switch role {
+	case "reception":
+		fields = append(fields,
+			map[string]any{"id": "chief_complaint", "label": "Chief Complaint", "type": "textarea", "required": true},
+			map[string]any{"id": "registration_notes", "label": "Registration Notes", "type": "textarea", "required": false},
+		)
+	case "triage_nurse":
+		fields = append(fields,
+			map[string]any{"id": "vitals", "label": "Vital Signs Summary", "type": "textarea", "required": true},
+			map[string]any{"id": "nurse_assessment", "label": "Nurse Assessment", "type": "textarea", "required": true},
+			map[string]any{"id": "nurse_treatment", "label": "Nurse Treatment", "type": "textarea", "required": false},
+			map[string]any{"id": "nurse_notes", "label": "Nurse Notes", "type": "textarea", "required": false},
+		)
+	case "physician":
+		fields = append(fields,
+			map[string]any{"id": "diagnosis", "label": "Primary Diagnosis", "type": "text", "required": true},
+			map[string]any{"id": "severity", "label": "Severity Level", "type": "select", "required": true, "options": triageOptions},
+			map[string]any{"id": "treatment_plan", "label": "Treatment Plan", "type": "textarea", "required": false},
+			map[string]any{"id": "admit", "label": "Admit to Hospital", "type": "boolean", "required": true},
+			map[string]any{"id": "clinical_notes", "label": "Clinical Notes", "type": "textarea", "required": false},
+		)
+	case "lab":
+		fields = append(fields,
+			map[string]any{"id": "lab_tests_requested", "label": "Lab Tests Requested", "type": "textarea", "required": true},
+			map[string]any{"id": "lab_findings", "label": "Lab Findings", "type": "textarea", "required": false},
+			map[string]any{"id": "lab_notes", "label": "Lab Notes", "type": "textarea", "required": false},
+		)
+	case "radiology":
+		fields = append(fields,
+			map[string]any{"id": "imaging_requested", "label": "Imaging Requested", "type": "textarea", "required": true},
+			map[string]any{"id": "radiology_findings", "label": "Radiology Findings", "type": "textarea", "required": false},
+			map[string]any{"id": "radiology_notes", "label": "Radiology Notes", "type": "textarea", "required": false},
+		)
+	default:
+		fields = append(fields,
+			map[string]any{"id": "status_summary", "label": "Status Summary", "type": "textarea", "required": false},
+			map[string]any{"id": "notes", "label": "Notes", "type": "textarea", "required": false},
+		)
 	}
+
+	fields = append(fields, map[string]any{"id": "handoff_notes", "label": "Handoff Notes", "type": "textarea", "required": false})
 
 	raw, err := json.Marshal(fields)
 	if err != nil {
