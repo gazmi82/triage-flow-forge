@@ -120,6 +120,129 @@ ORDER BY t.created_at DESC
 	return items, rows.Err()
 }
 
+func (r *Repository) FetchPatientMedicalRecord(ctx context.Context, taskID string) (contracts.PatientMedicalRecordPayload, error) {
+	pool, err := r.client.Pool(ctx)
+	if err != nil {
+		return contracts.PatientMedicalRecordPayload{}, err
+	}
+
+	taskID = strings.TrimSpace(taskID)
+	if taskID == "" {
+		return contracts.PatientMedicalRecordPayload{}, errors.New("taskId is required")
+	}
+
+	var (
+		snapshotRaw    json.RawMessage
+		processStatus  string
+		startedAt      time.Time
+		instanceRecord contracts.ProcessInstance
+	)
+	err = pool.QueryRow(ctx, `
+SELECT
+  st.snapshot,
+  st.process_status,
+  i.id,
+  i.definition_id,
+  COALESCE(d.name, '') AS definition_name,
+  i.status,
+  i.started_at,
+  COALESCE(u.name, 'System') AS started_by,
+  i.current_node,
+  i.priority,
+  COALESCE(i.patient_id, ''),
+  COALESCE(i.patient_name, '')
+FROM saved_tasks st
+JOIN process_instances i ON i.id = st.instance_id
+LEFT JOIN process_definitions d ON d.id = i.definition_id
+LEFT JOIN users u ON u.id = i.started_by_user_id
+WHERE st.task_id = $1
+`, taskID).Scan(
+		&snapshotRaw,
+		&processStatus,
+		&instanceRecord.ID,
+		&instanceRecord.DefinitionID,
+		&instanceRecord.DefinitionName,
+		&instanceRecord.Status,
+		&startedAt,
+		&instanceRecord.StartedBy,
+		&instanceRecord.CurrentNode,
+		&instanceRecord.Priority,
+		&instanceRecord.PatientID,
+		&instanceRecord.PatientName,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return contracts.PatientMedicalRecordPayload{}, errors.New("patient medical record not found")
+		}
+		return contracts.PatientMedicalRecordPayload{}, err
+	}
+	instanceRecord.StartedAt = startedAt.UTC().Format(time.RFC3339)
+
+	taskRecord := contracts.SavedTaskRecord{}
+	if len(snapshotRaw) > 0 {
+		if err := json.Unmarshal(snapshotRaw, &taskRecord); err != nil {
+			return contracts.PatientMedicalRecordPayload{}, fmt.Errorf("decode task snapshot: %w", err)
+		}
+	}
+	taskRecord["processStatus"] = processStatus
+
+	auditRows, err := pool.Query(ctx, `
+SELECT
+  id,
+  instance_id,
+  event_time,
+  actor,
+  COALESCE(role_key, 'admin') AS role_key,
+  event_type,
+  node_id,
+  node_name,
+  payload
+FROM audit_events
+WHERE instance_id = $1
+ORDER BY event_time DESC
+LIMIT 200
+`, instanceRecord.ID)
+	if err != nil {
+		return contracts.PatientMedicalRecordPayload{}, err
+	}
+	defer auditRows.Close()
+
+	audit := make([]contracts.AuditEvent, 0, 32)
+	for auditRows.Next() {
+		var (
+			item      contracts.AuditEvent
+			eventTime time.Time
+		)
+		if err := auditRows.Scan(
+			&item.ID,
+			&item.InstanceID,
+			&eventTime,
+			&item.Actor,
+			&item.Role,
+			&item.EventType,
+			&item.NodeID,
+			&item.NodeName,
+			&item.Payload,
+		); err != nil {
+			return contracts.PatientMedicalRecordPayload{}, err
+		}
+		item.Timestamp = eventTime.UTC().Format(time.RFC3339)
+		if item.Payload == nil {
+			item.Payload = json.RawMessage("{}")
+		}
+		audit = append(audit, item)
+	}
+	if err := auditRows.Err(); err != nil {
+		return contracts.PatientMedicalRecordPayload{}, err
+	}
+
+	return contracts.PatientMedicalRecordPayload{
+		Task:     taskRecord,
+		Instance: instanceRecord,
+		Audit:    audit,
+	}, nil
+}
+
 func (r *Repository) FetchTaskDesignerGraph(ctx context.Context, taskID string) (contracts.DesignerGraphPayload, error) {
 	return designerrepo.FetchTaskDesignerGraph(ctx, r.client.Pool, func(ctx context.Context) (contracts.DesignerGraphPayload, error) {
 		return bootstraprepo.FetchDesignerGraph(ctx, r.client.Pool)

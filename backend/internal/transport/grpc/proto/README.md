@@ -3,6 +3,8 @@
 Status: Placeholder for future internal gRPC contracts.
 
 Current production transport for browser is REST under `internal/transport/http`.
+Current REST includes patient medical record reads via:
+- `GET /api/tasks/:taskId/patient-record`
 
 ## Why this folder exists
 

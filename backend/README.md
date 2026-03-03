@@ -64,6 +64,7 @@ Loaded from env (`.env` or `backend/.env`) with defaults:
 - `GET /api/tasks`
 - `POST /api/tasks/create-from-console`
 - `GET /api/tasks/:taskId/designer`
+- `GET /api/tasks/:taskId/patient-record`
 - `POST /api/tasks/:taskId/claim`
 - `POST /api/tasks/:taskId/complete`
 - `PATCH|PUT|POST /api/tasks/:taskId` (save edits compatibility)
@@ -115,3 +116,9 @@ Frontend now calls backend-only transport. These endpoints are expected next for
 - `POST /api/workflow/publish`
 
 They are tracked in `BACKEND_NEXT_STEPS.md`.
+
+## Frontend Origin Notes (Dev)
+
+- Frontend runs on `http://localhost:8080`.
+- Backend runs on `http://localhost:8082`.
+- Browser requests should still appear as same-origin `http://localhost:8080/api/...` because Vite proxies API traffic to backend.

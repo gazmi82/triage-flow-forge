@@ -18,6 +18,10 @@ func (s Service) FetchTasks(ctx context.Context) ([]contracts.Task, error) {
 	return s.repo.FetchTasks(ctx)
 }
 
+func (s Service) FetchPatientMedicalRecord(ctx context.Context, taskID string) (contracts.PatientMedicalRecordPayload, error) {
+	return s.repo.FetchPatientMedicalRecord(ctx, taskID)
+}
+
 func (s Service) FetchTaskDesignerGraph(ctx context.Context, taskID string) (contracts.DesignerGraphPayload, error) {
 	return s.repo.FetchTaskDesignerGraph(ctx, taskID)
 }

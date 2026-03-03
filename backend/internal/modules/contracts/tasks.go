@@ -47,6 +47,12 @@ type TaskMutationResponse struct {
 	Audit      []AuditEvent         `json:"audit"`
 }
 
+type PatientMedicalRecordPayload struct {
+	Task     SavedTaskRecord `json:"task"`
+	Instance ProcessInstance `json:"instance"`
+	Audit    []AuditEvent    `json:"audit"`
+}
+
 type CompleteTaskRequest struct {
 	Actor       string `json:"actor"`
 	PatientName string `json:"patientName,omitempty"`

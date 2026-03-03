@@ -51,7 +51,8 @@ Vite proxies `/api`, `/health`, `/v1` to backend `http://127.0.0.1:8082`.
 
 ### Frontend
 
-- `VITE_API_BASE_URL` (optional; if unset, uses relative `/api`)
+- `VITE_API_BASE_URL` (optional, production-oriented)
+  In development this app uses same-origin relative `/api` with Vite proxy (`:8080 -> :8082`) by default.
 
 ## Current Product Status
 
@@ -61,13 +62,16 @@ Implemented and active:
 - Task APIs: fetch, claim, save edits, complete, delete
 - Task creation from console (`/api/tasks/create-from-console`)
 - Task-scoped designer projection (`/api/tasks/:taskId/designer`)
+- Patient medical record endpoint (`/api/tasks/:taskId/patient-record`)
 - Admin logs/incident APIs (`/api/admin/logs`, `/api/admin/logs/summary`)
 - Admin Logs UI tab with filters, table view, and charts
 - Admin Logs table pagination (20 rows default)
 - Per-row Message formatter switch (`Raw` / `JSON`) in log stream
 - Saved Tasks refactored to feature module with actions menu (`Canvas`, `View`, `Delete`)
-- New route: `/saved-tasks/:taskId/view` (static Patient Medical Record view)
+- New route: `/saved-tasks/:taskId/view` (live backend Patient Medical Record view)
 - Frontend transport now backend-only (runtime in-memory fallback removed)
+- Frontend dev transport uses same-origin `/api` through Vite proxy (`:8080 -> :8082`)
+- Production can use `VITE_API_BASE_URL` (optional) for direct API origin
 - Frontend contract/seed modules renamed for neutral naming:
   - `src/data/contracts.ts`
   - `src/data/bootstrapSeedApi.ts`
@@ -84,6 +88,7 @@ In progress / known gap:
 - Saved Tasks feature: `src/features/saved-tasks/`
 - Patient record view: `src/features/patient-record/PatientMedicalRecordPage.tsx`
 - API transport: `src/data/apiClient.ts`, `src/data/appApi.ts`
+- Axios compatibility shim: `src/lib/axios.ts`
 - State orchestration: `src/store/slices/workflowSlice.ts`, `src/store/slices/authSlice.ts`
 
 ## Key Backend Paths

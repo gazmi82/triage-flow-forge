@@ -8,6 +8,7 @@ import (
 
 type Repository interface {
 	FetchTasks(ctx context.Context) ([]contracts.Task, error)
+	FetchPatientMedicalRecord(ctx context.Context, taskID string) (contracts.PatientMedicalRecordPayload, error)
 	FetchTaskDesignerGraph(ctx context.Context, taskID string) (contracts.DesignerGraphPayload, error)
 	ClaimTask(ctx context.Context, taskID, assigneeName string) (contracts.TaskMutationResponse, error)
 	SaveTaskEdits(ctx context.Context, taskID string, req contracts.SaveTaskEditsRequest) (contracts.TaskMutationResponse, error)

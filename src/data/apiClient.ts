@@ -8,6 +8,7 @@ import type {
   CreateTaskFromConsolePayload,
   DesignerGraphPayload,
   DraftRecord,
+  PatientMedicalRecordPayload,
   ProcessInstance,
   SavedTaskRecord,
   Task,
@@ -15,7 +16,7 @@ import type {
   WorkflowBootstrapPayload,
 } from "@/data/contracts";
 
-const rawBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
+const rawBaseUrl = import.meta.env.PROD ? import.meta.env.VITE_API_BASE_URL?.trim() : "";
 const apiBaseUrl = rawBaseUrl && rawBaseUrl.length > 0 ? rawBaseUrl.replace(/\/+$/, "") : "";
 
 const endpoint = (path: string): string => (apiBaseUrl ? `${apiBaseUrl}${path}` : path);
@@ -355,6 +356,22 @@ export const apiClient = {
     }
 
     return (await response.json()) as DesignerGraphPayload;
+  },
+
+  async fetchPatientMedicalRecord(taskId: string): Promise<PatientMedicalRecordPayload> {
+    const response = await fetch(endpoint(`/api/tasks/${encodeURIComponent(taskId)}/patient-record`), {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        Accept: "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(await parseErrorMessage(response));
+    }
+
+    return (await response.json()) as PatientMedicalRecordPayload;
   },
 
   async fetchDrafts(): Promise<DraftRecord[]> {

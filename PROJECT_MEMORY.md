@@ -2,7 +2,7 @@
 
 Purpose: Keep durable project state so work can resume quickly after chat/session loss.
 
-Last updated: 2026-03-02
+Last updated: 2026-03-03
 
 ## Current Product Snapshot
 
@@ -26,6 +26,7 @@ Last updated: 2026-03-02
 3. Saved Tasks UX
 - Actions are in 3-dot menu: `Canvas`, `View`, `Delete`.
 - `View` opens new route: `/saved-tasks/:taskId/view`.
+- Patient record page is fed by backend API (`GET /api/tasks/:taskId/patient-record`), not static arrays.
 - `Delete` restricted to closed/END-completed process instances.
 
 4. Observability / Admin Logs
@@ -60,10 +61,16 @@ Last updated: 2026-03-02
 ### Frontend
 - Saved Tasks refactored into feature module:
   - `src/features/saved-tasks/*`
-- New static patient medical record page:
+- New live patient medical record page:
   - `src/features/patient-record/PatientMedicalRecordPage.tsx`
 - Runtime in-memory fallback removed from transport path:
   - `src/data/appApi.ts` now calls backend-only APIs.
+- Dev same-origin API behavior enforced:
+  - requests use relative `/api/*` under `http://localhost:8080`
+  - Vite proxy forwards to backend `http://127.0.0.1:8082`
+  - `VITE_API_BASE_URL` is now treated as production-oriented override
+- Local axios shim aligned with axios signature (supports optional config / `withCredentials`):
+  - `src/lib/axios.ts`
 - Admin page includes Logs & Incidents tab with charts, table pagination, and row formatter toggle.
 - Naming cleanup completed:
   - `src/data/contracts.ts` is the canonical frontend contract module.

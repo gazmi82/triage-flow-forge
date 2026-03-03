@@ -35,6 +35,10 @@ export const appApi = {
     return apiClient.fetchTaskDesignerGraph(taskId);
   },
 
+  async fetchPatientMedicalRecord(taskId: string) {
+    return apiClient.fetchPatientMedicalRecord(taskId);
+  },
+
   async claimTask(taskId: string, assigneeName: string) {
     return apiClient.claimTask(taskId, assigneeName);
   },

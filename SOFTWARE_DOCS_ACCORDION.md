@@ -28,7 +28,7 @@ Frontend:
 - `src/store/slices/workflowSlice.ts`: workflow state and thunks.
 - `src/store/slices/authSlice.ts`: auth/session state.
 - `src/features/saved-tasks/`: feature-oriented Saved Tasks module.
-- `src/features/patient-record/PatientMedicalRecordPage.tsx`: static patient record page.
+- `src/features/patient-record/PatientMedicalRecordPage.tsx`: backend-fed patient record page.
 - `src/data/apiClient.ts`, `src/data/appApi.ts`: backend transport path.
 
 Backend:
@@ -74,6 +74,7 @@ Backend notable APIs:
 - `GET /api/tasks`
 - `POST /api/tasks/create-from-console`
 - `GET /api/tasks/:taskId/designer`
+- `GET /api/tasks/:taskId/patient-record`
 - `POST /api/tasks/:taskId/claim`
 - `PATCH|PUT|POST /api/tasks/:taskId`
 - `POST /api/tasks/:taskId/complete`
@@ -88,6 +89,8 @@ Backend notable APIs:
 - END/closed semantics gate deletion.
 - Start-to-first-task edge enforcement is part of runtime graph shaping.
 - Frontend transport is backend-only (runtime in-memory fallback removed).
+- In development, UI and API are same-origin in browser (`http://localhost:8080/...`) via Vite proxy for `/api`, `/health`, `/v1`.
+- `VITE_API_BASE_URL` is optional and production-oriented; dev defaults to relative `/api`.
 - Logging/observability:
   - request + trace correlation IDs
   - sensitive field redaction

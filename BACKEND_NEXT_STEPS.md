@@ -1,6 +1,6 @@
 # Backend Next Steps (Execution Tracker)
 
-Last updated: 2026-03-02
+Last updated: 2026-03-03
 
 This file tracks what is already integrated vs what is still required for full backend parity.
 
@@ -19,6 +19,7 @@ This file tracks what is already integrated vs what is still required for full b
 - Workflow bootstrap endpoint.
 - Task runtime endpoints:
   - fetch tasks
+  - fetch patient medical record by task id
   - claim task
   - save task edits
   - complete task
@@ -57,6 +58,10 @@ This file tracks what is already integrated vs what is still required for full b
 
 Frontend `appApi` no longer falls back to runtime in-memory implementation.
 This means `saveDraft` and `publishDesignerGraph` should be implemented next.
+
+Patient record backend wiring is complete:
+- `GET /api/tasks/:taskId/patient-record`
+- Response shape includes `task`, `instance`, and `audit` arrays for the `/saved-tasks/:taskId/view` page.
 
 ### Required frontend/backend contract
 

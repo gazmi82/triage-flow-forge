@@ -16,6 +16,21 @@ export function formatTime(isoString: string): string {
   }
 }
 
+export function formatDateTime(isoString: string): string {
+  try {
+    return parseISO(isoString).toLocaleString([], {
+      year: "numeric",
+      month: "short",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
+  } catch {
+    return isoString;
+  }
+}
+
 export function minutesUntilDue(isoString: string, nowMs = Date.now()): number {
   try {
     const dueMs = parseISO(isoString).getTime();

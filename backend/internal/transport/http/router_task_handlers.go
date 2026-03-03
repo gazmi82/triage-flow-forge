@@ -33,6 +33,31 @@ func (s *server) handleTasks(w http.ResponseWriter, r *http.Request) {
 func (s *server) handleTaskActions(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/api/tasks/")
 	switch {
+	case r.Method == http.MethodGet && strings.HasSuffix(path, "/patient-record"):
+		taskID := strings.Trim(strings.TrimSuffix(path, "/patient-record"), "/")
+		if taskID == "" {
+			writeError(w, http.StatusBadRequest, "taskId is required")
+			return
+		}
+
+		record, err := s.deps.Tasks.FetchPatientMedicalRecord(r.Context(), taskID)
+		if err != nil {
+			if s.deps.Logger != nil {
+				s.deps.Logger.Warn(r.Context(), "workflow", "failed to fetch patient medical record", map[string]any{
+					"taskId": taskID,
+					"error":  err.Error(),
+				})
+			}
+			if strings.Contains(strings.ToLower(err.Error()), "not found") {
+				writeError(w, http.StatusNotFound, err.Error())
+				return
+			}
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, record)
+		return
+
 	case r.Method == http.MethodGet && strings.HasSuffix(path, "/designer"):
 		taskID := strings.Trim(strings.TrimSuffix(path, "/designer"), "/")
 		if taskID == "" {

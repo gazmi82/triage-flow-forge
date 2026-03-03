@@ -2,7 +2,8 @@ import axios from "axios";
 import type { BootstrapSeed, WorkflowBootstrapPayload } from "@/data/contracts";
 
 const endpoint = (path: string): string => {
-  const base = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
+  const base =
+    import.meta.env.PROD ? (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim() : "";
   if (!base || base === "/") return path;
   return `${base.replace(/\/$/, "")}${path}`;
 };

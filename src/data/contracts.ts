@@ -92,6 +92,12 @@ export interface SavedTaskRecord extends Task {
   processStatus: "open" | "closed";
 }
 
+export interface PatientMedicalRecordPayload {
+  task: SavedTaskRecord;
+  instance: ProcessInstance;
+  audit: AuditEvent[];
+}
+
 export interface AuditEvent {
   id: string;
   instanceId: string;
