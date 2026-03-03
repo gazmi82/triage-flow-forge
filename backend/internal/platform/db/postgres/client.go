@@ -47,6 +47,10 @@ func (c *Client) Ping(ctx context.Context) error {
 	return pool.Ping(ctx)
 }
 
+func (c *Client) Pool(ctx context.Context) (*pgxpool.Pool, error) {
+	return c.ensurePool(ctx)
+}
+
 func (c *Client) Close() {
 	c.mu.Lock()
 	defer c.mu.Unlock()

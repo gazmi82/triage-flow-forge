@@ -1,4 +1,4 @@
-package postgres
+package auth
 
 import (
 	"context"
@@ -9,15 +9,21 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
+	"triage-flow-forge/backend/internal/modules/contracts"
 )
 
 var emailRegex = regexp.MustCompile(`^[^\s@]+@[^\s@]+\.[^\s@]+$`)
 
-func (c *Client) CreateUser(ctx context.Context, req AdminCreateUserRequest) (AdminCreateUserResponse, error) {
-	pool, err := c.ensurePool(ctx)
+func CreateUser(
+	ctx context.Context,
+	ensurePool func(context.Context) (*pgxpool.Pool, error),
+	req contracts.AdminCreateUserRequest,
+) (contracts.AdminCreateUserResponse, error) {
+	pool, err := ensurePool(ctx)
 	if err != nil {
-		return AdminCreateUserResponse{}, err
+		return contracts.AdminCreateUserResponse{}, err
 	}
 
 	name := strings.TrimSpace(req.Name)
@@ -30,21 +36,21 @@ func (c *Client) CreateUser(ctx context.Context, req AdminCreateUserRequest) (Ad
 	}
 
 	if len(name) < 2 {
-		return AdminCreateUserResponse{}, errors.New("name must be at least 2 characters")
+		return contracts.AdminCreateUserResponse{}, errors.New("name must be at least 2 characters")
 	}
 	if !emailRegex.MatchString(email) {
-		return AdminCreateUserResponse{}, errors.New("please provide a valid email address")
+		return contracts.AdminCreateUserResponse{}, errors.New("please provide a valid email address")
 	}
 	if len(department) < 2 {
-		return AdminCreateUserResponse{}, errors.New("department must be at least 2 characters")
+		return contracts.AdminCreateUserResponse{}, errors.New("department must be at least 2 characters")
 	}
 	if len(password) < 6 {
-		return AdminCreateUserResponse{}, errors.New("password must be at least 6 characters")
+		return contracts.AdminCreateUserResponse{}, errors.New("password must be at least 6 characters")
 	}
 
 	tx, err := pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
-		return AdminCreateUserResponse{}, err
+		return contracts.AdminCreateUserResponse{}, err
 	}
 	defer func() {
 		_ = tx.Rollback(ctx)
@@ -56,7 +62,7 @@ SELECT COALESCE(MAX(CAST(SUBSTRING(id FROM 2) AS INTEGER)), 0)
 FROM users
 WHERE id ~ '^u[0-9]+$'
 `).Scan(&maxSuffix); err != nil {
-		return AdminCreateUserResponse{}, err
+		return contracts.AdminCreateUserResponse{}, err
 	}
 	newID := fmt.Sprintf("u%d", maxSuffix+1)
 
@@ -66,9 +72,9 @@ VALUES ($1, $2, $3, $4, $5, $6)
 `, newID, name, email, req.Role, department, active)
 	if err != nil {
 		if isUniqueViolation(err) {
-			return AdminCreateUserResponse{}, errors.New("a user with this email already exists")
+			return contracts.AdminCreateUserResponse{}, errors.New("a user with this email already exists")
 		}
-		return AdminCreateUserResponse{}, err
+		return contracts.AdminCreateUserResponse{}, err
 	}
 
 	_, err = tx.Exec(ctx, `
@@ -78,12 +84,12 @@ ON CONFLICT (user_id, role_key) DO UPDATE
 SET is_primary = EXCLUDED.is_primary
 `, newID, req.Role)
 	if err != nil {
-		return AdminCreateUserResponse{}, err
+		return contracts.AdminCreateUserResponse{}, err
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
-		return AdminCreateUserResponse{}, err
+		return contracts.AdminCreateUserResponse{}, err
 	}
 
 	_, err = tx.Exec(ctx, `
@@ -92,21 +98,21 @@ VALUES ($1, $2, $3, 'bcrypt')
 `, newID, email, string(hash))
 	if err != nil {
 		if isUniqueViolation(err) {
-			return AdminCreateUserResponse{}, errors.New("a user with this email already exists")
+			return contracts.AdminCreateUserResponse{}, errors.New("a user with this email already exists")
 		}
-		return AdminCreateUserResponse{}, err
+		return contracts.AdminCreateUserResponse{}, err
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return AdminCreateUserResponse{}, err
+		return contracts.AdminCreateUserResponse{}, err
 	}
 
-	users, err := c.FetchUsers(ctx)
+	users, err := FetchUsers(ctx, ensurePool)
 	if err != nil {
-		return AdminCreateUserResponse{}, err
+		return contracts.AdminCreateUserResponse{}, err
 	}
 
-	created := User{
+	created := contracts.User{
 		ID:         newID,
 		Name:       name,
 		Email:      email,
@@ -115,11 +121,14 @@ VALUES ($1, $2, $3, 'bcrypt')
 		Active:     active,
 	}
 
-	return AdminCreateUserResponse{Users: users, CreatedUser: created}, nil
+	return contracts.AdminCreateUserResponse{Users: users, CreatedUser: created}, nil
 }
 
-func (c *Client) FetchUsers(ctx context.Context) ([]User, error) {
-	pool, err := c.ensurePool(ctx)
+func FetchUsers(
+	ctx context.Context,
+	ensurePool func(context.Context) (*pgxpool.Pool, error),
+) ([]contracts.User, error) {
+	pool, err := ensurePool(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -134,9 +143,9 @@ ORDER BY id
 	}
 	defer rows.Close()
 
-	users := make([]User, 0)
+	users := make([]contracts.User, 0)
 	for rows.Next() {
-		var u User
+		var u contracts.User
 		if err := rows.Scan(&u.ID, &u.Name, &u.Email, &u.Role, &u.Department, &u.Active); err != nil {
 			return nil, err
 		}

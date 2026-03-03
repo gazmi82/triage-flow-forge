@@ -1,13 +1,15 @@
-package postgres
+package taskcreation
 
 import (
 	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
+
+	"triage-flow-forge/backend/internal/modules/contracts"
 )
 
-func validateCreateTaskFromConsoleRequest(req CreateTaskFromConsoleRequest) error {
+func validateCreateTaskFromConsoleRequest(req contracts.CreateTaskFromConsoleRequest) error {
 	if strings.TrimSpace(req.NodeType) == "" {
 		return errors.New("nodeType is required")
 	}
@@ -23,7 +25,7 @@ func validateCreateTaskFromConsoleRequest(req CreateTaskFromConsoleRequest) erro
 	return nil
 }
 
-func resolveInstanceID(req CreateTaskFromConsoleRequest, ts int64) string {
+func resolveInstanceID(req contracts.CreateTaskFromConsoleRequest, ts int64) string {
 	instanceID := fmt.Sprintf("pi-flow-%d", ts)
 	if req.InstanceID != nil && strings.TrimSpace(*req.InstanceID) != "" {
 		instanceID = strings.TrimSpace(*req.InstanceID)
@@ -31,7 +33,7 @@ func resolveInstanceID(req CreateTaskFromConsoleRequest, ts int64) string {
 	return instanceID
 }
 
-func resolvePatient(req CreateTaskFromConsoleRequest) (string, string) {
+func resolvePatient(req contracts.CreateTaskFromConsoleRequest) (string, string) {
 	patientName := "Unknown Patient"
 	if req.PatientName != nil && strings.TrimSpace(*req.PatientName) != "" {
 		patientName = strings.TrimSpace(*req.PatientName)
@@ -43,7 +45,7 @@ func resolvePatient(req CreateTaskFromConsoleRequest) (string, string) {
 	return patientName, patientID
 }
 
-func resolveTriage(req CreateTaskFromConsoleRequest) (color, priority, category string, slaMinutes int) {
+func resolveTriage(req contracts.CreateTaskFromConsoleRequest) (color, priority, category string, slaMinutes int) {
 	color = "yellow"
 	if req.TriageColor != nil && strings.TrimSpace(*req.TriageColor) != "" {
 		color = strings.TrimSpace(*req.TriageColor)
@@ -52,7 +54,7 @@ func resolveTriage(req CreateTaskFromConsoleRequest) (color, priority, category 
 	return color, priority, category, slaMinutes
 }
 
-func roleLabel(role Role) string {
+func roleLabel(role contracts.Role) string {
 	switch role {
 	case "reception":
 		return "Reception"
@@ -84,7 +86,7 @@ func triageMeta(color string) (priority string, category string, slaMinutes int)
 	}
 }
 
-func defaultTaskFormFields(role Role) json.RawMessage {
+func defaultTaskFormFields(role contracts.Role) json.RawMessage {
 	triageOptions := []string{"Immediate", "Very urgent", "Urgent", "Standard", "Non-urgent"}
 	base := []map[string]any{
 		{"id": "patient_name", "label": "Patient Name", "type": "text", "required": true},

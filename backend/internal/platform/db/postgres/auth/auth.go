@@ -1,4 +1,4 @@
-package postgres
+package auth
 
 import (
 	"context"
@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
+	"triage-flow-forge/backend/internal/modules/contracts"
 )
 
 var (
@@ -14,19 +16,24 @@ var (
 	ErrUserInactive       = errors.New("user not found or inactive")
 )
 
-func (c *Client) Login(ctx context.Context, email string, password string) (AuthPayload, error) {
-	pool, err := c.ensurePool(ctx)
+func Login(
+	ctx context.Context,
+	ensurePool func(context.Context) (*pgxpool.Pool, error),
+	email string,
+	password string,
+) (contracts.AuthPayload, error) {
+	pool, err := ensurePool(ctx)
 	if err != nil {
-		return AuthPayload{}, err
+		return contracts.AuthPayload{}, err
 	}
 
 	normalized := strings.TrimSpace(strings.ToLower(email))
 	if normalized == "" || strings.TrimSpace(password) == "" {
-		return AuthPayload{}, ErrInvalidCredentials
+		return contracts.AuthPayload{}, ErrInvalidCredentials
 	}
 
 	var (
-		payload       AuthPayload
+		payload       contracts.AuthPayload
 		active        bool
 		passwordHash  string
 		hashAlgorithm string
@@ -57,14 +64,14 @@ LIMIT 1
 		&hashAlgorithm,
 	)
 	if err != nil {
-		return AuthPayload{}, ErrInvalidCredentials
+		return contracts.AuthPayload{}, ErrInvalidCredentials
 	}
 	if !active {
-		return AuthPayload{}, ErrUserInactive
+		return contracts.AuthPayload{}, ErrUserInactive
 	}
 
 	if err := verifyPassword(password, passwordHash, hashAlgorithm); err != nil {
-		return AuthPayload{}, ErrInvalidCredentials
+		return contracts.AuthPayload{}, ErrInvalidCredentials
 	}
 
 	return payload, nil

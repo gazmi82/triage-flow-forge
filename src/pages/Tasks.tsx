@@ -137,12 +137,18 @@ export default function Tasks() {
     );
     setSelectedTaskId(null);
 
+    const redirectedTaskLabel = `${ROLE_LABELS[payload.redirectRole]} Task`;
+    const primaryNodeLabel =
+      selectedNodeType === "userTask"
+        ? redirectedTaskLabel
+        : getDefaultNodeLabel(selectedNodeType);
+
     const createNodeResult = await dispatch(
       createTaskFromConsoleThunk({
         fromNodeId: completedTask.nodeId ?? null,
         instanceId: completedTask.instanceId,
         nodeType: selectedNodeType,
-        label: getDefaultNodeLabel(selectedNodeType, completedTask.name),
+        label: primaryNodeLabel,
         conditionExpression: payload.conditionExpression,
         correlationKey: payload.correlationKey,
         assignedRole: payload.redirectRole,
@@ -332,8 +338,8 @@ export default function Tasks() {
   const liveSecondsRemaining = selectedTask ? secondsUntilDue(selectedTask.dueAt, nowMs) : 0;
 
   return (
-    <div className="flex h-full flex-col md:flex-row">
-      <div className="flex w-full flex-col border-b border-border bg-card md:w-72 md:min-w-72 md:border-b-0 md:border-r lg:w-80 lg:min-w-80">
+    <div className="flex h-full min-h-0 flex-col md:flex-row">
+      <div className="flex min-h-0 w-full flex-col border-b border-border bg-card md:w-72 md:min-w-72 md:border-b-0 md:border-r lg:w-80 lg:min-w-80">
         <TaskInbox
           tasks={filtered}
           search={search}
@@ -354,7 +360,7 @@ export default function Tasks() {
       </div>
 
       {selectedTask ? (
-        <div className="flex flex-1 flex-col overflow-hidden">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <div className="border-b border-border bg-card px-4 py-4 md:px-6">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div className="min-w-0">
@@ -391,8 +397,8 @@ export default function Tasks() {
             </div>
           </div>
 
-          <div className="flex flex-1 flex-col overflow-hidden md:flex-row">
-            <div className="flex-1 overflow-y-auto p-6">
+          <div className="flex min-h-0 flex-1 flex-col overflow-y-auto md:flex-row">
+            <div className="min-h-0 flex-1 p-6">
               <p className="mb-4 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Task Form</p>
               <div className="max-w-lg">
                 <TaskForm
@@ -405,7 +411,7 @@ export default function Tasks() {
             </div>
 
             {showTimeline && (
-              <div className="w-full overflow-y-auto border-t border-border bg-muted/20 p-4 md:w-72 md:border-l md:border-t-0">
+              <div className="min-h-0 w-full border-t border-border bg-muted/20 p-4 md:w-72 md:border-l md:border-t-0">
                 <p className="mb-4 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Audit Timeline</p>
                 <AuditTimeline instanceId={selectedTask.instanceId} events={audit} />
               </div>
@@ -413,7 +419,7 @@ export default function Tasks() {
           </div>
         </div>
       ) : (
-        <div className="flex flex-1 flex-col overflow-y-auto">
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
           <div className="border-b border-border bg-card px-4 py-4 md:px-6">
             <div className="flex items-center gap-2">
               <CheckCircle2 className="h-5 w-5 text-success" />

@@ -473,7 +473,7 @@ export function TaskForm({ task, selectedNodeType, onComplete, onSave }: TaskFor
       </div>
       )}
 
-      <div className="flex gap-2 pt-2">
+      <div className="flex gap-2 pt-2 pb-6">
         <Button type="button" variant="outline" size="sm" onClick={handleSave}>
           Save
         </Button>

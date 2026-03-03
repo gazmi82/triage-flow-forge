@@ -13,7 +13,4 @@ export const NODE_TYPE_LABELS: Record<TaskNodeType, string> = {
   andGateway: "AND Gateway",
 };
 
-export const getDefaultNodeLabel = (type: TaskNodeType, seed?: string) => {
-  if (seed?.trim()) return `${seed.trim()} Next`;
-  return NODE_TYPE_LABELS[type];
-};
+export const getDefaultNodeLabel = (type: TaskNodeType) => NODE_TYPE_LABELS[type];

@@ -1,13 +1,19 @@
-package postgres
+package bootstrap
 
 import (
 	"context"
 	"encoding/json"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+	"triage-flow-forge/backend/internal/modules/contracts"
 )
 
-func (c *Client) fetchDefinitions(ctx context.Context) ([]ProcessDefinition, error) {
-	pool, err := c.ensurePool(ctx)
+func FetchDefinitions(
+	ctx context.Context,
+	ensurePool func(context.Context) (*pgxpool.Pool, error),
+) ([]contracts.ProcessDefinition, error) {
+	pool, err := ensurePool(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -34,9 +40,9 @@ ORDER BY d.id
 	}
 	defer rows.Close()
 
-	items := make([]ProcessDefinition, 0)
+	items := make([]contracts.ProcessDefinition, 0)
 	for rows.Next() {
-		var item ProcessDefinition
+		var item contracts.ProcessDefinition
 		var createdAt, updatedAt time.Time
 		if err := rows.Scan(
 			&item.ID,
@@ -61,8 +67,11 @@ ORDER BY d.id
 	return items, rows.Err()
 }
 
-func (c *Client) fetchInstances(ctx context.Context) ([]ProcessInstance, error) {
-	pool, err := c.ensurePool(ctx)
+func FetchInstances(
+	ctx context.Context,
+	ensurePool func(context.Context) (*pgxpool.Pool, error),
+) ([]contracts.ProcessInstance, error) {
+	pool, err := ensurePool(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -89,9 +98,9 @@ ORDER BY i.started_at DESC
 	}
 	defer rows.Close()
 
-	items := make([]ProcessInstance, 0)
+	items := make([]contracts.ProcessInstance, 0)
 	for rows.Next() {
-		var item ProcessInstance
+		var item contracts.ProcessInstance
 		var startedAt time.Time
 		if err := rows.Scan(
 			&item.ID,
@@ -114,8 +123,11 @@ ORDER BY i.started_at DESC
 	return items, rows.Err()
 }
 
-func (c *Client) fetchTasks(ctx context.Context) ([]Task, error) {
-	pool, err := c.ensurePool(ctx)
+func FetchTasks(
+	ctx context.Context,
+	ensurePool func(context.Context) (*pgxpool.Pool, error),
+) ([]contracts.Task, error) {
+	pool, err := ensurePool(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -150,9 +162,9 @@ ORDER BY t.created_at DESC
 	}
 	defer rows.Close()
 
-	items := make([]Task, 0)
+	items := make([]contracts.Task, 0)
 	for rows.Next() {
-		var item Task
+		var item contracts.Task
 		var assigneeName *string
 		var createdAt, dueAt time.Time
 		var updatedAt *time.Time

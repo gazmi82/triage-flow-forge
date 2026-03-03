@@ -1,4 +1,4 @@
-package postgres
+package bootstrap
 
 import (
 	"context"
@@ -6,12 +6,17 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+	"triage-flow-forge/backend/internal/modules/contracts"
 	"triage-flow-forge/backend/internal/platform/db/postgres/taskcreation"
 	"triage-flow-forge/backend/internal/platform/db/postgres/taskdesigner"
 )
 
-func (c *Client) fetchSavedTasks(ctx context.Context) ([]SavedTaskRecord, error) {
-	pool, err := c.ensurePool(ctx)
+func FetchSavedTasks(
+	ctx context.Context,
+	ensurePool func(context.Context) (*pgxpool.Pool, error),
+) ([]contracts.SavedTaskRecord, error) {
+	pool, err := ensurePool(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -26,14 +31,14 @@ ORDER BY updated_at DESC
 	}
 	defer rows.Close()
 
-	items := make([]SavedTaskRecord, 0)
+	items := make([]contracts.SavedTaskRecord, 0)
 	for rows.Next() {
 		var raw json.RawMessage
 		var processStatus string
 		if err := rows.Scan(&raw, &processStatus); err != nil {
 			return nil, err
 		}
-		record := SavedTaskRecord{}
+		record := contracts.SavedTaskRecord{}
 		if len(raw) > 0 {
 			if err := json.Unmarshal(raw, &record); err != nil {
 				return nil, err
@@ -46,8 +51,11 @@ ORDER BY updated_at DESC
 	return items, rows.Err()
 }
 
-func (c *Client) fetchAudit(ctx context.Context) ([]AuditEvent, error) {
-	pool, err := c.ensurePool(ctx)
+func FetchAudit(
+	ctx context.Context,
+	ensurePool func(context.Context) (*pgxpool.Pool, error),
+) ([]contracts.AuditEvent, error) {
+	pool, err := ensurePool(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -71,9 +79,9 @@ ORDER BY event_time DESC
 	}
 	defer rows.Close()
 
-	items := make([]AuditEvent, 0)
+	items := make([]contracts.AuditEvent, 0)
 	for rows.Next() {
-		var item AuditEvent
+		var item contracts.AuditEvent
 		var eventTime time.Time
 		if err := rows.Scan(
 			&item.ID,
@@ -98,10 +106,13 @@ ORDER BY event_time DESC
 	return items, rows.Err()
 }
 
-func (c *Client) fetchDesignerGraph(ctx context.Context) (DesignerGraphPayload, error) {
-	pool, err := c.ensurePool(ctx)
+func FetchDesignerGraph(
+	ctx context.Context,
+	ensurePool func(context.Context) (*pgxpool.Pool, error),
+) (contracts.DesignerGraphPayload, error) {
+	pool, err := ensurePool(ctx)
 	if err != nil {
-		return DesignerGraphPayload{}, err
+		return contracts.DesignerGraphPayload{}, err
 	}
 
 	var raw json.RawMessage
@@ -112,15 +123,15 @@ ORDER BY updated_at DESC
 LIMIT 1
 `).Scan(&raw)
 	if err != nil {
-		return DesignerGraphPayload{Nodes: []map[string]any{}, Edges: []map[string]any{}}, nil
+		return contracts.DesignerGraphPayload{Nodes: []map[string]any{}, Edges: []map[string]any{}}, nil
 	}
 
-	graph := DesignerGraphPayload{Nodes: []map[string]any{}, Edges: []map[string]any{}}
+	graph := contracts.DesignerGraphPayload{Nodes: []map[string]any{}, Edges: []map[string]any{}}
 	if len(raw) == 0 {
 		return graph, nil
 	}
 	if err := json.Unmarshal(raw, &graph); err != nil {
-		return DesignerGraphPayload{Nodes: []map[string]any{}, Edges: []map[string]any{}}, nil
+		return contracts.DesignerGraphPayload{Nodes: []map[string]any{}, Edges: []map[string]any{}}, nil
 	}
 	if graph.Nodes == nil {
 		graph.Nodes = []map[string]any{}
@@ -128,9 +139,9 @@ LIMIT 1
 	if graph.Edges == nil {
 		graph.Edges = []map[string]any{}
 	}
-	graph, err = c.hydrateBootstrapGraphRuntime(ctx, graph)
+	graph, err = hydrateBootstrapGraphRuntime(ctx, ensurePool, graph)
 	if err != nil {
-		return DesignerGraphPayload{}, err
+		return contracts.DesignerGraphPayload{}, err
 	}
 	return graph, nil
 }
@@ -143,8 +154,12 @@ type taskRuntimeSnapshot struct {
 	UpdatedAt   time.Time
 }
 
-func (c *Client) hydrateBootstrapGraphRuntime(ctx context.Context, graph DesignerGraphPayload) (DesignerGraphPayload, error) {
-	pool, err := c.ensurePool(ctx)
+func hydrateBootstrapGraphRuntime(
+	ctx context.Context,
+	ensurePool func(context.Context) (*pgxpool.Pool, error),
+	graph contracts.DesignerGraphPayload,
+) (contracts.DesignerGraphPayload, error) {
+	pool, err := ensurePool(ctx)
 	if err != nil {
 		return graph, err
 	}
@@ -205,7 +220,6 @@ ORDER BY updated_at DESC
 		}
 	}
 
-	// Ensure each instance has a Start -> first node edge if missing.
 	for instanceID, nodes := range nodesByInstance {
 		startID := startByInstance[instanceID]
 		if startID == "" {
@@ -224,8 +238,8 @@ ORDER BY updated_at DESC
 			var firstX float64
 			firstSet := false
 			for _, node := range nodes {
-				nodeType, _ := node["type"].(string)
 				nodeID, _ := node["id"].(string)
+				nodeType, _ := node["type"].(string)
 				if nodeID == "" || nodeID == startID || nodeType == "startEvent" {
 					continue
 				}
@@ -264,8 +278,11 @@ ORDER BY updated_at DESC
 	return graph, nil
 }
 
-func (c *Client) fetchDrafts(ctx context.Context) ([]DraftRecord, error) {
-	pool, err := c.ensurePool(ctx)
+func FetchDrafts(
+	ctx context.Context,
+	ensurePool func(context.Context) (*pgxpool.Pool, error),
+) ([]contracts.DraftRecord, error) {
+	pool, err := ensurePool(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -280,16 +297,16 @@ ORDER BY saved_at DESC
 	}
 	defer rows.Close()
 
-	items := make([]DraftRecord, 0)
+	items := make([]contracts.DraftRecord, 0)
 	for rows.Next() {
-		var item DraftRecord
+		var item contracts.DraftRecord
 		var savedAt time.Time
 		var graphRaw json.RawMessage
 		if err := rows.Scan(&item.ID, &item.Name, &item.Version, &savedAt, &graphRaw); err != nil {
 			return nil, err
 		}
 		item.SavedAt = savedAt.UTC().Format(time.RFC3339)
-		item.Graph = DesignerGraphPayload{Nodes: []map[string]any{}, Edges: []map[string]any{}}
+		item.Graph = contracts.DesignerGraphPayload{Nodes: []map[string]any{}, Edges: []map[string]any{}}
 		if len(graphRaw) > 0 {
 			if err := json.Unmarshal(graphRaw, &item.Graph); err != nil {
 				return nil, err

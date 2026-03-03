@@ -44,12 +44,12 @@ function ProtectedApp() {
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       <Sidebar />
-      <main className="flex flex-1 flex-col overflow-hidden">
+      <main className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <TopNavbar />
         {isLoading ? (
           <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">Loading data...</div>
         ) : (
-          <div className="flex-1 overflow-hidden">
+          <div className="min-h-0 flex-1 overflow-hidden">
             <Routes>
               {isAdmin ? (
                 <>

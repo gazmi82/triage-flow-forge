@@ -3,41 +3,9 @@ package postgres
 import (
 	"context"
 	"encoding/json"
-	"errors"
 
 	"github.com/jackc/pgx/v5"
 )
-
-func (c *Client) fetchTaskMutationResponse(ctx context.Context) (TaskMutationResponse, error) {
-	tasks, err := c.fetchTasks(ctx)
-	if err != nil {
-		return TaskMutationResponse{}, err
-	}
-	savedTasks, err := c.fetchSavedTasks(ctx)
-	if err != nil {
-		return TaskMutationResponse{}, err
-	}
-	graph, err := c.fetchDesignerGraph(ctx)
-	if err != nil {
-		return TaskMutationResponse{}, err
-	}
-	instances, err := c.fetchInstances(ctx)
-	if err != nil {
-		return TaskMutationResponse{}, err
-	}
-	audit, err := c.fetchAudit(ctx)
-	if err != nil {
-		return TaskMutationResponse{}, err
-	}
-
-	return TaskMutationResponse{
-		Tasks:      tasks,
-		SavedTasks: savedTasks,
-		Graph:      graph,
-		Instances:  instances,
-		Audit:      audit,
-	}, nil
-}
 
 func (c *Client) buildTaskSnapshot(ctx context.Context, tx pgx.Tx, taskID string) (json.RawMessage, error) {
 	var taskSnapshot json.RawMessage
@@ -77,31 +45,5 @@ VALUES ($1, $2, $3, $4, NOW())
 ON CONFLICT (task_id) DO UPDATE
 SET process_status = EXCLUDED.process_status, snapshot = EXCLUDED.snapshot, updated_at = NOW()
 `, taskID, instanceID, processStatus, taskSnapshot)
-	return err
-}
-
-func (c *Client) refreshInstanceCurrentNode(ctx context.Context, tx pgx.Tx, instanceID, patientName, patientID string) error {
-	var currentNode string
-	err := c.queryRowTx(ctx, tx, "instance.current_node.select_open_task", `
-SELECT name
-FROM tasks
-WHERE instance_id = $1 AND status <> 'completed'
-ORDER BY updated_at DESC NULLS LAST, created_at DESC
-LIMIT 1
-`, instanceID).Scan(&currentNode)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			currentNode = "Awaiting Next Step"
-		} else {
-			return err
-		}
-	}
-
-	status := "active"
-	err = c.execTx(ctx, tx, "instance.current_node.update", `
-UPDATE process_instances
-SET current_node = $2, status = $3, patient_name = $4, patient_id = $5, updated_at = NOW()
-WHERE id = $1
-`, instanceID, currentNode, status, patientName, patientID)
 	return err
 }

@@ -1,4 +1,4 @@
-package postgres
+package auth
 
 import "triage-flow-forge/backend/internal/modules/contracts"
 
