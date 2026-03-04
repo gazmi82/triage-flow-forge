@@ -115,7 +115,7 @@ export function TopNavbar() {
               </p>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => showNotImplemented("Profile")}>
+            <DropdownMenuItem onSelect={() => navigate("/profile")}>
               <UserRound className="mr-2 h-4 w-4" />
               Profile
             </DropdownMenuItem>
