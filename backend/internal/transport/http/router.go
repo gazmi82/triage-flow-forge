@@ -7,6 +7,7 @@ import (
 	"triage-flow-forge/backend/internal/modules/admin"
 	"triage-flow-forge/backend/internal/modules/auth"
 	"triage-flow-forge/backend/internal/modules/contracts"
+	"triage-flow-forge/backend/internal/modules/profile"
 	workflowbootstrap "triage-flow-forge/backend/internal/modules/workflow/bootstrap"
 	workflowtaskcreation "triage-flow-forge/backend/internal/modules/workflow/taskcreation"
 	workflowtasks "triage-flow-forge/backend/internal/modules/workflow/tasks"
@@ -23,6 +24,7 @@ type Dependencies struct {
 	Logger    *logging.Logger
 	Auth      auth.Repository
 	Admin     admin.Repository
+	Profile   profile.Repository
 	Bootstrap workflowbootstrap.Repository
 	Tasks     workflowtasks.Repository
 	Creation  workflowtaskcreation.Repository
@@ -57,6 +59,9 @@ func NewRouter(deps Dependencies) http.Handler {
 	)
 	mux.Handle("/api/admin/logs/summary",
 		middleware.Chain(http.HandlerFunc(srv.handleAdminLogSummary), srv.requireSession, srv.requireRoles(contracts.Role("admin"))),
+	)
+	mux.Handle("/api/profile",
+		middleware.Chain(http.HandlerFunc(srv.handleProfile), srv.requireSession),
 	)
 	mux.Handle("/api/tasks",
 		middleware.Chain(http.HandlerFunc(srv.handleTasks), srv.requireSession),

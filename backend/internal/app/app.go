@@ -9,6 +9,8 @@ import (
 	adminrepo "triage-flow-forge/backend/internal/modules/admin/repository/postgres"
 	"triage-flow-forge/backend/internal/modules/auth"
 	authrepo "triage-flow-forge/backend/internal/modules/auth/repository/postgres"
+	"triage-flow-forge/backend/internal/modules/profile"
+	profilerepo "triage-flow-forge/backend/internal/modules/profile/repository/postgres"
 	workflowbootstrap "triage-flow-forge/backend/internal/modules/workflow/bootstrap"
 	bootstraprepo "triage-flow-forge/backend/internal/modules/workflow/bootstrap/repository/postgres"
 	workflowtaskcreation "triage-flow-forge/backend/internal/modules/workflow/taskcreation"
@@ -41,6 +43,7 @@ func New(cfg Config) (*App, error) {
 	rdb := redis.NewClient(cfg.RedisAddr, cfg.RedisPassword, cfg.RedisDB)
 	authService := auth.NewService(authrepo.New(pg))
 	adminService := admin.NewService(adminrepo.New(pg))
+	profileService := profile.NewService(profilerepo.New(pg))
 	bootstrapService := workflowbootstrap.NewService(bootstraprepo.New(pg))
 	tasksService := workflowtasks.NewService(tasksrepo.New(pg))
 	taskCreationService := workflowtaskcreation.NewService(taskcreationrepo.New(pg))
@@ -52,6 +55,7 @@ func New(cfg Config) (*App, error) {
 		Logger:    appLogger,
 		Auth:      authService,
 		Admin:     adminService,
+		Profile:   profileService,
 		Bootstrap: bootstrapService,
 		Tasks:     tasksService,
 		Creation:  taskCreationService,
