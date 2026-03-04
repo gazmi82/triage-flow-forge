@@ -60,12 +60,12 @@ export function SavedTasksPage() {
 
   const openDraft = async (draftId: string) => {
     await dispatch(loadDraftThunk({ draftId }));
-    navigate("/designer");
+    navigate("/designer?mode=draft");
   };
 
   const openCanvas = async (taskId: string) => {
     await dispatch(openTaskDesignerThunk({ taskId }));
-    navigate("/designer");
+    navigate(`/designer?taskId=${encodeURIComponent(taskId)}`);
   };
 
   const openPatientRecordView = (taskId: string) => {

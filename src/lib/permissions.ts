@@ -29,7 +29,7 @@ export function canAccessRoute(role: Role | null | undefined, route: AppNavRoute
 }
 
 export function getDefaultRouteForRole(role?: Role | null): AppNavRoute {
-  return isAdminRole(role) ? "/" : "/designer";
+  return isAdminRole(role) ? "/" : "/tasks";
 }
 
 export function getRouteTitle(pathname: string): string {

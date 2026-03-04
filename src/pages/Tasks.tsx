@@ -331,7 +331,7 @@ export default function Tasks() {
 
   const openTaskProcessDesign = async (taskId: string) => {
     await dispatch(openTaskDesignerThunk({ taskId }));
-    navigate("/designer");
+    navigate(`/designer?taskId=${encodeURIComponent(taskId)}`);
   };
 
   const liveMinutesRemaining = selectedTask ? minutesUntilDue(selectedTask.dueAt, nowMs) : 0;

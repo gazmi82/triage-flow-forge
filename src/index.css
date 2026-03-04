@@ -4,64 +4,65 @@
 
 @layer base {
   :root {
-    /* Navy/Blue primary */
-    --background: 220 20% 97%;
-    --foreground: 220 30% 12%;
+    /* Medify-inspired light dashboard palette */
+    --background: 214 22% 95%;
+    --foreground: 224 30% 14%;
 
     --card: 0 0% 100%;
-    --card-foreground: 220 30% 12%;
+    --card-foreground: 224 30% 14%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 220 30% 12%;
+    --popover-foreground: 224 30% 14%;
 
-    --primary: 220 68% 22%;
+    /* Deep navy actions/buttons */
+    --primary: 234 45% 13%;
     --primary-foreground: 0 0% 98%;
 
-    --secondary: 210 25% 93%;
-    --secondary-foreground: 220 30% 20%;
+    --secondary: 214 20% 92%;
+    --secondary-foreground: 224 22% 24%;
 
-    --muted: 216 20% 93%;
-    --muted-foreground: 215 20% 48%;
+    --muted: 214 22% 92%;
+    --muted-foreground: 216 14% 46%;
 
-    /* Medical teal accent */
-    --accent: 178 55% 38%;
+    /* Cyan highlight accent */
+    --accent: 198 58% 47%;
     --accent-foreground: 0 0% 100%;
 
     --destructive: 4 86% 54%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 218 22% 87%;
-    --input: 218 22% 87%;
-    --ring: 220 68% 30%;
+    --border: 214 20% 85%;
+    --input: 214 20% 85%;
+    --ring: 198 58% 47%;
 
     --radius: 0.5rem;
 
     /* Status colors */
-    --success: 142 60% 36%;
+    --success: 146 56% 42%;
     --success-foreground: 0 0% 100%;
-    --warning: 38 90% 48%;
+    --warning: 38 82% 59%;
     --warning-foreground: 0 0% 100%;
-    --info: 208 80% 50%;
+    --info: 198 58% 47%;
     --info-foreground: 0 0% 100%;
 
-    /* Sidebar */
-    --sidebar-background: 220 50% 16%;
-    --sidebar-foreground: 215 30% 82%;
-    --sidebar-primary: 178 55% 45%;
+    /* Sidebar (light, like reference) */
+    --sidebar-background: 210 30% 98%;
+    --sidebar-foreground: 216 11% 57%;
+    --sidebar-primary: 188 68% 48%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 220 40% 22%;
-    --sidebar-accent-foreground: 215 30% 90%;
-    --sidebar-border: 220 40% 20%;
-    --sidebar-ring: 178 55% 45%;
+    --sidebar-accent: 198 72% 89%;
+    --sidebar-accent-foreground: 198 60% 47%;
+    --sidebar-border: 214 24% 90%;
+    --sidebar-ring: 188 68% 48%;
 
     /* BPM node colors */
-    --node-start: 142 60% 36%;
+    --node-start: 146 56% 42%;
     --node-end: 4 86% 48%;
-    --node-task: 220 68% 30%;
-    --node-gateway-xor: 38 90% 48%;
-    --node-gateway-and: 278 60% 48%;
-    --node-timer: 208 80% 46%;
-    --node-message: 178 55% 38%;
+    --node-task: 222 60% 34%;
+    --node-gateway-xor: 38 82% 56%;
+    --node-gateway-and: 278 56% 52%;
+    --node-timer: 198 58% 47%;
+    --node-message: 198 58% 47%;
   }
 }
 

@@ -28,7 +28,7 @@ export default function Draft() {
 
   const openDraft = async (draftId: string) => {
     await dispatch(loadDraftThunk({ draftId }));
-    navigate("/designer");
+    navigate("/designer?mode=draft");
   };
 
   return (
