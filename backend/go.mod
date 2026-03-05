@@ -1,4 +1,4 @@
-module triage-flow-forge/backend
+module github.com/gazmi82/triage-flow-forge/backend
 
 go 1.24.0
 
