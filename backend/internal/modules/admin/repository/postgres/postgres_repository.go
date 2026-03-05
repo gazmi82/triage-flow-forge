@@ -10,8 +10,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"golang.org/x/crypto/bcrypt"
-	"triage-flow-forge/backend/internal/modules/contracts"
-	dbpostgres "triage-flow-forge/backend/internal/platform/db/postgres"
+	"github.com/gazmi82/triage-flow-forge/backend/internal/modules/contracts"
+	dbpostgres "github.com/gazmi82/triage-flow-forge/backend/internal/platform/db/postgres"
 )
 
 type Repository struct {

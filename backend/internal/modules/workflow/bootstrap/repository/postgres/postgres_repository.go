@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"time"
 
-	"triage-flow-forge/backend/internal/modules/contracts"
-	dbpostgres "triage-flow-forge/backend/internal/platform/db/postgres"
-	"triage-flow-forge/backend/internal/platform/db/postgres/taskcreation"
-	"triage-flow-forge/backend/internal/platform/db/postgres/taskdesigner"
+	"github.com/gazmi82/triage-flow-forge/backend/internal/modules/contracts"
+	dbpostgres "github.com/gazmi82/triage-flow-forge/backend/internal/platform/db/postgres"
+	"github.com/gazmi82/triage-flow-forge/backend/internal/platform/db/postgres/taskcreation"
+	"github.com/gazmi82/triage-flow-forge/backend/internal/platform/db/postgres/taskdesigner"
 )
 
 type Repository struct {

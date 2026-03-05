@@ -4,17 +4,17 @@ import (
 	"context"
 	"net/http"
 
-	"triage-flow-forge/backend/internal/modules/admin"
-	"triage-flow-forge/backend/internal/modules/auth"
-	"triage-flow-forge/backend/internal/modules/contracts"
-	"triage-flow-forge/backend/internal/modules/profile"
-	workflowbootstrap "triage-flow-forge/backend/internal/modules/workflow/bootstrap"
-	workflowtaskcreation "triage-flow-forge/backend/internal/modules/workflow/taskcreation"
-	workflowtasks "triage-flow-forge/backend/internal/modules/workflow/tasks"
-	"triage-flow-forge/backend/internal/platform/cache/redis"
-	"triage-flow-forge/backend/internal/platform/logging"
-	"triage-flow-forge/backend/internal/platform/metrics"
-	"triage-flow-forge/backend/internal/transport/http/middleware"
+	"github.com/gazmi82/triage-flow-forge/backend/internal/modules/admin"
+	"github.com/gazmi82/triage-flow-forge/backend/internal/modules/auth"
+	"github.com/gazmi82/triage-flow-forge/backend/internal/modules/contracts"
+	"github.com/gazmi82/triage-flow-forge/backend/internal/modules/profile"
+	workflowbootstrap "github.com/gazmi82/triage-flow-forge/backend/internal/modules/workflow/bootstrap"
+	workflowtaskcreation "github.com/gazmi82/triage-flow-forge/backend/internal/modules/workflow/taskcreation"
+	workflowtasks "github.com/gazmi82/triage-flow-forge/backend/internal/modules/workflow/tasks"
+	"github.com/gazmi82/triage-flow-forge/backend/internal/platform/cache/redis"
+	"github.com/gazmi82/triage-flow-forge/backend/internal/platform/logging"
+	"github.com/gazmi82/triage-flow-forge/backend/internal/platform/metrics"
+	"github.com/gazmi82/triage-flow-forge/backend/internal/transport/http/middleware"
 )
 
 type Dependencies struct {

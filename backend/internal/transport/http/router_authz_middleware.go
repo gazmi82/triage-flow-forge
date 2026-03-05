@@ -5,8 +5,8 @@ import (
 	"errors"
 	"net/http"
 
-	"triage-flow-forge/backend/internal/modules/contracts"
-	"triage-flow-forge/backend/internal/transport/http/middleware"
+	"github.com/gazmi82/triage-flow-forge/backend/internal/modules/contracts"
+	"github.com/gazmi82/triage-flow-forge/backend/internal/transport/http/middleware"
 )
 
 type authUserCtxKey string

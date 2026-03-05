@@ -1,8 +1,8 @@
 package postgres
 
 import (
-	"triage-flow-forge/backend/internal/modules/contracts"
-	authrepo "triage-flow-forge/backend/internal/platform/db/postgres/auth"
+	"github.com/gazmi82/triage-flow-forge/backend/internal/modules/contracts"
+	authrepo "github.com/gazmi82/triage-flow-forge/backend/internal/platform/db/postgres/auth"
 )
 
 type Role = contracts.Role

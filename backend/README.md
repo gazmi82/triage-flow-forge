@@ -2,6 +2,12 @@
 
 Go backend for Triage Flow Forge.
 
+## Module Path
+
+This backend is a Go submodule published as:
+
+`github.com/gazmi82/triage-flow-forge/backend`
+
 ## Responsibilities
 
 - Serve REST APIs consumed by frontend
@@ -58,6 +64,7 @@ Loaded from env (`.env` or `backend/.env`) with defaults:
 - `POST /api/admin/users`
 - `GET /api/admin/logs`
 - `GET /api/admin/logs/summary`
+- `GET /api/profile`
 
 ### Workflow/Tasks
 - `GET /api/workflow/bootstrap`
@@ -104,6 +111,7 @@ Task mutation responses are returned as aggregate payloads to keep frontend stat
 - `internal/modules/contracts/`: shared DTO contracts
 - `internal/modules/*`: module service/repository ports
 - `internal/platform/db/postgres/`: DB adapters
+- `internal/platform/db/postgres/profile/`: profile analytics query/computation layer
 - `internal/platform/db/postgres/taskcreation/`: graph append/routing algorithms
 - `internal/platform/db/postgres/taskdesigner/`: runtime graph projection/enrichment helpers
 - `internal/transport/http/`: handlers + router
@@ -116,6 +124,12 @@ Frontend now calls backend-only transport. These endpoints are expected next for
 - `POST /api/workflow/publish`
 
 They are tracked in `BACKEND_NEXT_STEPS.md`.
+
+## pkg.go.dev visibility
+
+- Root repository now contains `LICENSE` (MIT), required for redistributable docs rendering.
+- If docs are stale, publish a new tag and request index refresh:
+  - `https://pkg.go.dev/github.com/gazmi82/triage-flow-forge/backend`
 
 ## Frontend Origin Notes (Dev)
 

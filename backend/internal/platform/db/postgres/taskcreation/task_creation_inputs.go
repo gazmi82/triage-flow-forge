@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"triage-flow-forge/backend/internal/modules/contracts"
+	"github.com/gazmi82/triage-flow-forge/backend/internal/modules/contracts"
 )
 
 func validateCreateTaskFromConsoleRequest(req contracts.CreateTaskFromConsoleRequest) error {

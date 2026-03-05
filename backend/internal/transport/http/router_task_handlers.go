@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	"triage-flow-forge/backend/internal/modules/contracts"
+	"github.com/gazmi82/triage-flow-forge/backend/internal/modules/contracts"
 )
 
 type claimTaskRequest struct {

@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"triage-flow-forge/backend/internal/modules/contracts"
-	authrepo "triage-flow-forge/backend/internal/platform/db/postgres/auth"
+	"github.com/gazmi82/triage-flow-forge/backend/internal/modules/contracts"
+	authrepo "github.com/gazmi82/triage-flow-forge/backend/internal/platform/db/postgres/auth"
 )
 
 func FetchWorkflowBootstrap(

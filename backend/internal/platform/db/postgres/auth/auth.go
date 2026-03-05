@@ -8,7 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
-	"triage-flow-forge/backend/internal/modules/contracts"
+	"github.com/gazmi82/triage-flow-forge/backend/internal/modules/contracts"
 )
 
 var (

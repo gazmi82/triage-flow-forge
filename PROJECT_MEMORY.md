@@ -2,7 +2,7 @@
 
 Purpose: Keep durable project state so work can resume quickly after chat/session loss.
 
-Last updated: 2026-03-03
+Last updated: 2026-03-05
 
 ## Current Product Snapshot
 
@@ -37,6 +37,15 @@ Last updated: 2026-03-03
   - pagination (20 rows default)
   - per-row formatter toggle (`Raw` vs `JSON`) for `fields`
 
+5. Profile backend feature
+- New authenticated profile endpoint is live:
+  - `GET /api/profile`
+- Response includes user-scoped analytics payload:
+  - role peers, personal tasks/audit
+  - patient activity
+  - activity timeline and event mix
+  - workload and SLA metrics
+
 ## Recent Architecture Changes
 
 ### Backend
@@ -57,6 +66,13 @@ Last updated: 2026-03-03
   - `backend/internal/platform/logging/*`
 - Added admin log handlers:
   - `backend/internal/transport/http/router_admin_logs_handlers.go`
+- Added profile module:
+  - `backend/internal/modules/profile/*`
+  - `backend/internal/platform/db/postgres/profile/profile.go`
+  - `backend/internal/transport/http/router_profile_handlers.go`
+- Go module path moved to public repo path:
+  - `github.com/gazmi82/triage-flow-forge/backend`
+- Root `LICENSE` (MIT) added for pkg.go.dev redistributable docs rendering.
 
 ### Frontend
 - Saved Tasks refactored into feature module:
@@ -93,6 +109,9 @@ Last updated: 2026-03-03
 3. Legacy in-memory API cleanup
 - Runtime path no longer depends on any in-memory fallback; backend transport is the source of truth.
 - In-memory API modules under `src/data/api/*` are retained only for test scaffolding.
+
+4. Profile frontend integration
+- Backend endpoint exists (`GET /api/profile`), but profile page still needs dedicated API consumption wiring to fully switch off bootstrap-derived analytics.
 
 ## Quick Rehydrate Map (If Context Resets)
 

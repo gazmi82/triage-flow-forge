@@ -71,6 +71,7 @@ Backend notable APIs:
 - `POST /api/admin/users`
 - `GET /api/admin/logs`
 - `GET /api/admin/logs/summary`
+- `GET /api/profile`
 - `GET /api/tasks`
 - `POST /api/tasks/create-from-console`
 - `GET /api/tasks/:taskId/designer`
@@ -96,6 +97,9 @@ Backend notable APIs:
   - sensitive field redaction
   - DB slow/failure logging with query hash
   - admin-facing log table and chart summary
+- Backend module path:
+  - `github.com/gazmi82/triage-flow-forge/backend`
+- Root MIT `LICENSE` is present for pkg.go.dev redistributable docs rendering.
 
 </details>
 

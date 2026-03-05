@@ -1,6 +1,6 @@
 package auth
 
-import "triage-flow-forge/backend/internal/modules/contracts"
+import "github.com/gazmi82/triage-flow-forge/backend/internal/modules/contracts"
 
 type Role = contracts.Role
 type User = contracts.User

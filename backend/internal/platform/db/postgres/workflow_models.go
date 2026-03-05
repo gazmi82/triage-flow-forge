@@ -1,6 +1,6 @@
 package postgres
 
-import "triage-flow-forge/backend/internal/modules/contracts"
+import "github.com/gazmi82/triage-flow-forge/backend/internal/modules/contracts"
 
 type ProcessDefinition = contracts.ProcessDefinition
 type ProcessInstance = contracts.ProcessInstance

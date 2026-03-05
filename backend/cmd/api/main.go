@@ -6,7 +6,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"triage-flow-forge/backend/internal/app"
+	"github.com/gazmi82/triage-flow-forge/backend/internal/app"
 )
 
 func main() {

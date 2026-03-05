@@ -3,7 +3,7 @@ package tasks
 import (
 	"context"
 
-	"triage-flow-forge/backend/internal/modules/contracts"
+	"github.com/gazmi82/triage-flow-forge/backend/internal/modules/contracts"
 )
 
 type Service struct {

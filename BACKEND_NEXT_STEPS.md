@@ -1,6 +1,6 @@
 # Backend Next Steps (Execution Tracker)
 
-Last updated: 2026-03-03
+Last updated: 2026-03-05
 
 This file tracks what is already integrated vs what is still required for full backend parity.
 
@@ -13,6 +13,8 @@ This file tracks what is already integrated vs what is still required for full b
 - Auth login/session/logout with Redis-backed session cookie.
 - Route-level authz middleware and RBAC gate for admin endpoints.
 - Admin user creation endpoint.
+- Profile analytics endpoint:
+  - `GET /api/profile`
 - Admin runtime logs endpoints:
   - `GET /api/admin/logs`
   - `GET /api/admin/logs/summary`
@@ -26,6 +28,9 @@ This file tracks what is already integrated vs what is still required for full b
   - create task from console
   - delete task (restricted by END/closed process)
   - task-scoped designer graph fetch
+- Backend module path migration completed:
+  - `github.com/gazmi82/triage-flow-forge/backend`
+- Root MIT license added to support pkg.go.dev redistributable documentation display.
 - Shared contracts extracted into `internal/modules/contracts`.
 - Postgres refactor to reduce long files and isolate graph-runtime helpers.
 - Structured logging stack:
@@ -58,6 +63,9 @@ This file tracks what is already integrated vs what is still required for full b
 
 Frontend `appApi` no longer falls back to runtime in-memory implementation.
 This means `saveDraft` and `publishDesignerGraph` should be implemented next.
+
+Additional near-term priority:
+- Wire frontend Profile page to consume `GET /api/profile` directly.
 
 Patient record backend wiring is complete:
 - `GET /api/tasks/:taskId/patient-record`

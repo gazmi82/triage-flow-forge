@@ -7,8 +7,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"triage-flow-forge/backend/internal/modules/contracts"
-	"triage-flow-forge/backend/internal/platform/db/postgres/taskcreation"
+	"github.com/gazmi82/triage-flow-forge/backend/internal/modules/contracts"
+	"github.com/gazmi82/triage-flow-forge/backend/internal/platform/db/postgres/taskcreation"
 )
 
 func FetchTaskDesignerGraph(

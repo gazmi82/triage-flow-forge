@@ -3,9 +3,9 @@ package postgres
 import (
 	"context"
 
-	"triage-flow-forge/backend/internal/modules/contracts"
-	dbpostgres "triage-flow-forge/backend/internal/platform/db/postgres"
-	profilerepo "triage-flow-forge/backend/internal/platform/db/postgres/profile"
+	"github.com/gazmi82/triage-flow-forge/backend/internal/modules/contracts"
+	dbpostgres "github.com/gazmi82/triage-flow-forge/backend/internal/platform/db/postgres"
+	profilerepo "github.com/gazmi82/triage-flow-forge/backend/internal/platform/db/postgres/profile"
 )
 
 type Repository struct {

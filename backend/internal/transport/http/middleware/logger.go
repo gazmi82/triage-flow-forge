@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"triage-flow-forge/backend/internal/platform/logging"
+	"github.com/gazmi82/triage-flow-forge/backend/internal/platform/logging"
 )
 
 type responseRecorder struct {

@@ -11,8 +11,8 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"triage-flow-forge/backend/internal/platform/logging"
-	"triage-flow-forge/backend/internal/platform/metrics"
+	"github.com/gazmi82/triage-flow-forge/backend/internal/platform/logging"
+	"github.com/gazmi82/triage-flow-forge/backend/internal/platform/metrics"
 )
 
 type Client struct {

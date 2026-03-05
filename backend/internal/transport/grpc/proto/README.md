@@ -5,10 +5,14 @@ Status: Placeholder for future internal gRPC contracts.
 Current production transport for browser is REST under `internal/transport/http`.
 Current REST includes patient medical record reads via:
 - `GET /api/tasks/:taskId/patient-record`
+Current REST also includes profile analytics reads via:
+- `GET /api/profile`
 
 ## Why this folder exists
 
 The backend uses modular boundaries that can later expose gRPC services without redesigning domain contracts.
+Module path:
+- `github.com/gazmi82/triage-flow-forge/backend`
 
 Planned service groups:
 - `AuthService`

@@ -8,9 +8,9 @@ import (
 	"net/http"
 	"time"
 
-	"triage-flow-forge/backend/internal/modules/contracts"
-	"triage-flow-forge/backend/internal/platform/cache/redis"
-	"triage-flow-forge/backend/internal/platform/db/postgres"
+	"github.com/gazmi82/triage-flow-forge/backend/internal/modules/contracts"
+	"github.com/gazmi82/triage-flow-forge/backend/internal/platform/cache/redis"
+	"github.com/gazmi82/triage-flow-forge/backend/internal/platform/db/postgres"
 )
 
 type loginRequest struct {

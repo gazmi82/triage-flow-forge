@@ -3,10 +3,10 @@ package postgres
 import (
 	"context"
 
-	"triage-flow-forge/backend/internal/modules/contracts"
-	dbpostgres "triage-flow-forge/backend/internal/platform/db/postgres"
-	bootstraprepo "triage-flow-forge/backend/internal/platform/db/postgres/bootstrap"
-	dbtaskcreation "triage-flow-forge/backend/internal/platform/db/postgres/taskcreation"
+	"github.com/gazmi82/triage-flow-forge/backend/internal/modules/contracts"
+	dbpostgres "github.com/gazmi82/triage-flow-forge/backend/internal/platform/db/postgres"
+	bootstraprepo "github.com/gazmi82/triage-flow-forge/backend/internal/platform/db/postgres/bootstrap"
+	dbtaskcreation "github.com/gazmi82/triage-flow-forge/backend/internal/platform/db/postgres/taskcreation"
 )
 
 type Repository struct {

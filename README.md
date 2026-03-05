@@ -64,6 +64,7 @@ Implemented and active:
 - Task-scoped designer projection (`/api/tasks/:taskId/designer`)
 - Patient medical record endpoint (`/api/tasks/:taskId/patient-record`)
 - Admin logs/incident APIs (`/api/admin/logs`, `/api/admin/logs/summary`)
+- Profile analytics API (`/api/profile`) with authenticated user-scoped metrics
 - Admin Logs UI tab with filters, table view, and charts
 - Admin Logs table pagination (20 rows default)
 - Per-row Message formatter switch (`Raw` / `JSON`) in log stream
@@ -76,6 +77,11 @@ Implemented and active:
   - `src/data/contracts.ts`
   - `src/data/bootstrapSeedApi.ts`
   - `src/data/inMemoryApi.ts`
+
+Also completed:
+- Backend Go module path migrated to public GitHub module path:
+  - `github.com/gazmi82/triage-flow-forge/backend`
+- Repository root license added (`LICENSE`, MIT) so pkg.go.dev can render package docs after tagging.
 
 In progress / known gap:
 - Designer draft/publish endpoints still need backend route wiring to match frontend calls:
@@ -96,11 +102,24 @@ In progress / known gap:
 - App wiring: `backend/internal/app/app.go`
 - HTTP router: `backend/internal/transport/http/router.go`
 - Auth handlers: `backend/internal/transport/http/router_auth_handlers.go`
+- Profile handlers: `backend/internal/transport/http/router_profile_handlers.go`
 - Task handlers: `backend/internal/transport/http/router_task_handlers.go`
 - Postgres adapters: `backend/internal/platform/db/postgres/`
+- Profile postgres logic: `backend/internal/platform/db/postgres/profile/`
 - Graph routing logic: `backend/internal/platform/db/postgres/taskcreation/`
 - Runtime designer graph helpers: `backend/internal/platform/db/postgres/taskdesigner/`
 - Shared contracts: `backend/internal/modules/contracts/`
+
+## Go Module / pkg.go.dev
+
+- Backend module path (in `backend/go.mod`):
+  - `module github.com/gazmi82/triage-flow-forge/backend`
+- If docs do not appear immediately on pkg.go.dev:
+  1. Push latest commit with `go.mod` + `LICENSE`.
+  2. Push a new tag (for example `v0.1.1`).
+  3. Request/index module at:
+     - `https://pkg.go.dev/github.com/gazmi82/triage-flow-forge/backend`
+     - `https://proxy.golang.org/github.com/gazmi82/triage-flow-forge/backend/@latest`
 
 ## Test / Build
 
