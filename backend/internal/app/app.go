@@ -34,6 +34,8 @@ type App struct {
 	logger     *logging.Logger
 }
 
+// New builds the application runtime with configured infrastructure clients,
+// module services, and HTTP transport wiring.
 func New(cfg Config) (*App, error) {
 	appLogger := logging.NewFromEnv()
 	pg := postgres.NewClient(cfg.PostgresDSN)
@@ -76,6 +78,8 @@ func New(cfg Config) (*App, error) {
 	}, nil
 }
 
+// Run starts the HTTP server and keeps it alive until the provided context is
+// canceled or the server exits with an error.
 func (a *App) Run(ctx context.Context) error {
 	defer a.postgres.Close()
 	defer func() { _ = a.redis.Close() }()

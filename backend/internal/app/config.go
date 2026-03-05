@@ -6,6 +6,7 @@ import (
 	"strings"
 )
 
+// Config defines runtime environment settings used by the backend app.
 type Config struct {
 	HTTPAddr      string
 	PostgresDSN   string
@@ -14,6 +15,8 @@ type Config struct {
 	RedisDB       string
 }
 
+// LoadConfig loads application configuration from environment variables with
+// fallbacks to local development defaults.
 func LoadConfig() Config {
 	loadDotEnv()
 
