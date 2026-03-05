@@ -15,6 +15,9 @@ This file tracks what is already integrated vs what is still required for full b
 - Admin user creation endpoint.
 - Profile analytics endpoint:
   - `GET /api/profile`
+- Package documentation scaffolding for pkg.go.dev:
+  - package comments via `doc.go` for command and core library packages
+  - exported comments added in `internal/app` entry points
 - Admin runtime logs endpoints:
   - `GET /api/admin/logs`
   - `GET /api/admin/logs/summary`
@@ -58,6 +61,9 @@ This file tracks what is already integrated vs what is still required for full b
 - Add endpoint-level mutation success/failure counters and latency buckets.
 5. Persisted log sink
 - Optional persistent sink (Postgres/ELK/OpenSearch) in addition to in-memory ring buffer.
+
+6. Profile endpoint adoption in frontend
+- Replace bootstrap-derived analytics in Profile page with direct `GET /api/profile` consumption.
 
 ## Immediate Priority (because frontend now uses backend-only transport)
 
@@ -146,3 +152,13 @@ If context resets, read in this order:
 2. `PROJECT_MEMORY.md`
 3. this file (`BACKEND_NEXT_STEPS.md`)
 4. `backend/README.md`
+
+## Release/Tag Notes (Backend Submodule)
+
+- Backend module path is `github.com/gazmi82/triage-flow-forge/backend`.
+- Prefer backend-scoped tags to make module release intent explicit:
+  - `backend/vX.Y.Z`
+- Example release flow:
+  1. `git push origin main`
+  2. `git tag backend/v0.1.2`
+  3. `git push origin backend/v0.1.2`

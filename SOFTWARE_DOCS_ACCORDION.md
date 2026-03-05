@@ -104,7 +104,25 @@ Backend notable APIs:
 </details>
 
 <details>
-<summary><strong>7) Admin Logs UX</strong></summary>
+<summary><strong>7) Profile Integration (Latest)</strong></summary>
+
+- New backend endpoint: `GET /api/profile`.
+- Scope: authenticated session user (cookie-based auth).
+- Returns:
+  - role peers
+  - personal tasks and audit history
+  - patient activity aggregation
+  - event mix + 7-day activity timeline
+  - workload/SLA KPIs and activity score
+- Backend implementation:
+  - service/repository port: `internal/modules/profile/*`
+  - postgres logic: `internal/platform/db/postgres/profile/profile.go`
+  - handler/route: `internal/transport/http/router_profile_handlers.go`
+
+</details>
+
+<details>
+<summary><strong>8) Admin Logs UX</strong></summary>
 
 - Logs tab supports filtering by level, channel, search term, and lookback window.
 - Log stream table has pagination with default 20 rows/page.
@@ -115,7 +133,22 @@ Backend notable APIs:
 </details>
 
 <details>
-<summary><strong>8) Known Gaps</strong></summary>
+<summary><strong>9) Package Docs and Publishing</strong></summary>
+
+- Backend module path:
+  - `github.com/gazmi82/triage-flow-forge/backend`
+- pkg.go.dev docs visibility requirements:
+  - valid public `go.mod` module path
+  - recognized OSS license (`LICENSE`, MIT present)
+  - package comments (`doc.go`) in target packages
+- Command packages (`cmd/api`) are expected to show concise docs only.
+- Preferred backend release tag format:
+  - `backend/vX.Y.Z`
+
+</details>
+
+<details>
+<summary><strong>10) Known Gaps</strong></summary>
 
 - Backend routes for drafts/publish still need full wiring:
   - `POST /api/workflow/drafts`
@@ -125,7 +158,7 @@ Backend notable APIs:
 </details>
 
 <details>
-<summary><strong>9) Fast Context Recovery</strong></summary>
+<summary><strong>11) Fast Context Recovery</strong></summary>
 
 If chat/session resets, read in this order:
 

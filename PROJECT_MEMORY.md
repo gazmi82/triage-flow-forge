@@ -46,6 +46,17 @@ Last updated: 2026-03-05
   - activity timeline and event mix
   - workload and SLA metrics
 
+6. Go package publication setup
+- Backend module path is now public and canonical:
+  - `github.com/gazmi82/triage-flow-forge/backend`
+- MIT license present at repository root (`LICENSE`) to satisfy redistributable license checks on pkg.go.dev.
+- `doc.go` package comments were added for command and library packages to render pkg.go.dev docs sections.
+- Exported comments were added to core app entry points:
+  - `app.New`
+  - `app.Run`
+  - `app.Config`
+  - `app.LoadConfig`
+
 ## Recent Architecture Changes
 
 ### Backend
@@ -73,6 +84,12 @@ Last updated: 2026-03-05
 - Go module path moved to public repo path:
   - `github.com/gazmi82/triage-flow-forge/backend`
 - Root `LICENSE` (MIT) added for pkg.go.dev redistributable docs rendering.
+- Package documentation setup completed for key packages:
+  - `backend/cmd/api/doc.go`
+  - `backend/internal/app/doc.go`
+  - `backend/internal/modules/{admin,auth,contracts,profile,workflow/*}/doc.go`
+  - `backend/internal/transport/http/doc.go`
+  - `backend/internal/platform/db/postgres/doc.go`
 
 ### Frontend
 - Saved Tasks refactored into feature module:
@@ -112,6 +129,11 @@ Last updated: 2026-03-05
 
 4. Profile frontend integration
 - Backend endpoint exists (`GET /api/profile`), but profile page still needs dedicated API consumption wiring to fully switch off bootstrap-derived analytics.
+
+5. Release hygiene for docs visibility
+- Keep version tags progressing after docs/comments changes that affect pkg.go.dev rendering.
+- Preferred backend tag format for submodule:
+  - `backend/vX.Y.Z`
 
 ## Quick Rehydrate Map (If Context Resets)
 

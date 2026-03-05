@@ -6,6 +6,25 @@ Hospital emergency workflow platform with:
 
 This README is maintained as the primary recovery point if chat/session context is lost.
 
+## Last Integration (2026-03-05)
+
+Latest backend/doc integration completed:
+- New authenticated profile analytics endpoint: `GET /api/profile`
+- Backend module path migrated to:
+  - `github.com/gazmi82/triage-flow-forge/backend`
+- Root OSS license added:
+  - `LICENSE` (MIT)
+- Package-level Go documentation stubs added for pkg.go.dev:
+  - `backend/cmd/api/doc.go`
+  - `backend/internal/app/doc.go`
+  - `backend/internal/modules/*/doc.go` (core modules)
+  - `backend/internal/transport/http/doc.go`
+  - `backend/internal/platform/db/postgres/doc.go`
+
+Notes about pkg.go.dev behavior:
+- Command packages (for example `cmd/api`) naturally show minimal docs (overview + source files).
+- Library packages (`internal/app`, `internal/modules/*`) show richer docs when package comments and exported symbol comments exist.
+
 ## Architecture Overview
 
 - Frontend (`/src`): role-based app shell, task operations, process designer UI.
@@ -116,10 +135,39 @@ In progress / known gap:
   - `module github.com/gazmi82/triage-flow-forge/backend`
 - If docs do not appear immediately on pkg.go.dev:
   1. Push latest commit with `go.mod` + `LICENSE`.
-  2. Push a new tag (for example `v0.1.1`).
+  2. Push a new tag (for example `v0.1.2`).
   3. Request/index module at:
      - `https://pkg.go.dev/github.com/gazmi82/triage-flow-forge/backend`
      - `https://proxy.golang.org/github.com/gazmi82/triage-flow-forge/backend/@latest`
+
+Recommended tag strategy for backend module in subdirectory `/backend`:
+- Prefer submodule tags:
+  - `backend/vX.Y.Z`
+- Example:
+  - `git tag backend/v0.1.2 && git push origin backend/v0.1.2`
+
+## Profile API Summary
+
+Endpoint:
+- `GET /api/profile` (requires valid `triage_session` cookie)
+
+Payload includes:
+- session user and current user record
+- peer users in the same role lane
+- personal task scope and personal audit timeline
+- patient activity rollup
+- event type breakdown and 7-day activity bars
+- workload/quality metrics:
+  - `completedCount`
+  - `claimedCount`
+  - `pendingCount`
+  - `overdueCount`
+  - `openWorkload`
+  - `completionRate`
+  - `avgCycleMinutes`
+  - `slaRiskCount`
+  - `activeInstanceCount`
+  - `activityScore`
 
 ## Test / Build
 

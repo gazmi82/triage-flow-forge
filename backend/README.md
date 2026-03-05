@@ -84,6 +84,39 @@ Loaded from env (`.env` or `backend/.env`) with defaults:
 - Login issues `triage_session` HTTP-only cookie.
 - Frontend bootstrap now reads backend bootstrap payload directly (no static public JSON seed file).
 
+## Profile API (Detailed)
+
+### Endpoint
+
+- `GET /api/profile`
+
+### Auth model
+
+- Requires active session (`triage_session` cookie in Redis-backed session store).
+- User identity is extracted from auth middleware context and used as the profile scope.
+
+### Returned shape (high level)
+
+- `user`, `currentUser`, `profileRole`
+- `peerUsers`
+- `personalTasks`, `personalAudit`
+- `patientActivity`, `eventBreakdown`, `activityByDay`
+- `priorityDistribution`, `triageDistribution`
+- computed KPI fields:
+  - `completedCount`, `claimedCount`, `pendingCount`, `overdueCount`
+  - `openWorkload`, `completionRate`, `avgCycleMinutes`, `slaRiskCount`
+  - `activeInstanceCount`, `activityScore`
+  - `firstAudit`, `lastAudit`
+
+### Query/compute implementation
+
+- Postgres query/computation module:
+  - `internal/platform/db/postgres/profile/profile.go`
+- Service/repository wiring:
+  - `internal/modules/profile/*`
+- HTTP transport:
+  - `internal/transport/http/router_profile_handlers.go`
+
 ## Logging / Observability
 
 - Structured JSON logs with `level`, `channel`, `requestId`, and `traceId`.
@@ -116,6 +149,26 @@ Task mutation responses are returned as aggregate payloads to keep frontend stat
 - `internal/platform/db/postgres/taskdesigner/`: runtime graph projection/enrichment helpers
 - `internal/transport/http/`: handlers + router
 
+## Package Documentation Setup (pkg.go.dev)
+
+The backend now includes package comments via `doc.go` in key packages so pkg.go.dev renders documentation sections:
+
+- `cmd/api/doc.go`
+- `internal/app/doc.go`
+- `internal/modules/contracts/doc.go`
+- `internal/modules/auth/doc.go`
+- `internal/modules/admin/doc.go`
+- `internal/modules/profile/doc.go`
+- `internal/modules/workflow/bootstrap/doc.go`
+- `internal/modules/workflow/tasks/doc.go`
+- `internal/modules/workflow/taskcreation/doc.go`
+- `internal/transport/http/doc.go`
+- `internal/platform/db/postgres/doc.go`
+
+Important:
+- `cmd/api` is a command package; it will still display minimal docs by design.
+- richer API docs appear in library packages with exported symbols + comments.
+
 ## Current Gaps
 
 Frontend now calls backend-only transport. These endpoints are expected next for full designer parity:
@@ -130,6 +183,12 @@ They are tracked in `BACKEND_NEXT_STEPS.md`.
 - Root repository now contains `LICENSE` (MIT), required for redistributable docs rendering.
 - If docs are stale, publish a new tag and request index refresh:
   - `https://pkg.go.dev/github.com/gazmi82/triage-flow-forge/backend`
+
+Recommended tag format for backend submodule:
+- `backend/vX.Y.Z`
+- Example:
+  - `git tag backend/v0.1.2`
+  - `git push origin backend/v0.1.2`
 
 ## Frontend Origin Notes (Dev)
 

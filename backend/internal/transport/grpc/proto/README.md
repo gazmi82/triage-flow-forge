@@ -14,6 +14,10 @@ The backend uses modular boundaries that can later expose gRPC services without 
 Module path:
 - `github.com/gazmi82/triage-flow-forge/backend`
 
+Package documentation setup:
+- package-level `doc.go` files exist in core backend packages to improve pkg.go.dev output.
+- command package docs (`cmd/api`) are intentionally concise.
+
 Planned service groups:
 - `AuthService`
 - `AdminService`
